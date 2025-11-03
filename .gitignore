@@ -12,6 +12,8 @@ test/gate_level_netlist.v
 obj_dir/
 verilator/audio_*.wav
 verilator/obj_dir/
+verilator/obj_dir_audio/
 verilator/goosegame
 verilator/vgademo
 verilator/*.vcd
+verilator/test_audio

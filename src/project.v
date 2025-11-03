@@ -53,6 +53,7 @@ module tt_um_goose_game(
 
   // Audio signals
   wire audio_pwm;
+  wire signed [15:0] audio_sample;  // For testbench/debug (unused in hardware)
   reg event_jump_prev;
   wire event_jump = jump_button && !event_jump_prev;
   wire event_death = collision && !game_over;
@@ -139,7 +140,8 @@ module tt_um_goose_game(
     .event_death(event_death),
     .event_highscore(event_highscore),
     .game_running(game_running),
-    .audio_pwm(audio_pwm)
+    .audio_pwm(audio_pwm),
+    .audio_sample(audio_sample)
   );
 
   // Game state machine
