@@ -11,3 +11,7 @@ test/results.xml
 test/gate_level_netlist.v
 obj_dir/
 verilator/audio_*.wav
+verilator/obj_dir/
+verilator/goosegame
+verilator/vgademo
+verilator/*.vcd
