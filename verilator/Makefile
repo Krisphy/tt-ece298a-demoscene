@@ -23,7 +23,7 @@ VGADEMO_SOURCES = $(SRC_DIR)/vga_example.v \
 AUDIO_SOURCES = $(SRC_DIR)/audio.v
 
 # Build targets
-all: goosegame vgademo
+all: goosegame vgademo test_audio
 
 goosegame: $(GOOSE_SOURCES) goosegame_tb.cpp
 	$(VERILATOR) $(VERILATOR_FLAGS) $^ \
