@@ -16,12 +16,30 @@ module tt_um_example (
     input  wire       rst_n     // reset_n - low to reset
 );
 
-  // All output pins must be assigned. If not used, assign to 0.
-  assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
-  assign uio_out = 0;
-  assign uio_oe  = 0;
+  // Audio module signals
+  wire audio_pwm;
+  
+  // Instantiate audio module
+  audio audio_inst (
+    .clk(clk),
+    .rst_n(rst_n),
+    .event_jump(ui_in[1]),        // Use ui_in[1] as jump button
+    .event_death(ui_in[2]),       // Use ui_in[2] for death (test)
+    .event_highscore(ui_in[3]),   // Use ui_in[3] for high score (test)
+    .game_running(ui_in[0]),      // Use ui_in[0] to control game_running
+    .audio_pwm(audio_pwm)
+  );
 
-  // List all unused inputs to prevent warnings
-  wire _unused = &{ena, clk, rst_n, 1'b0};
+  // Connect audio to uio_out[7] (A_PWM per proposal)
+  assign uio_out[7] = audio_pwm;
+  assign uio_oe[7] = 1'b1;       // Enable as output
+  
+  // Other outputs
+  assign uio_out[6:0] = 7'b0;
+  assign uio_oe[6:0] = 7'b0;
+  assign uo_out = 8'b0;  // TODO: Connect VGA outputs here
+
+  // Mark unused inputs
+  wire _unused = &{ena, uio_in, 1'b0};
 
 endmodule
