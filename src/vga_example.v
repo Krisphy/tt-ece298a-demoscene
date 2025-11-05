@@ -1,6 +1,7 @@
 /*
- * Simple VGA example - moving color pattern
- * Original demo for testing VGA output
+ * Demo lifted from https://vga-playground.com/
+ * Just for testing VGA output
+ * Unused in goosegame
  */
 
 `default_nettype none

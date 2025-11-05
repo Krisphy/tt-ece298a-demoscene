@@ -32,8 +32,8 @@ module audio (
     output wire signed [15:0] audio_sample
 );
 
-  // 50MHz / 1024 ≈ 48.8kHz sample rate
-  reg [9:0] sample_div;
+  // 25MHz / 512 ≈ 48.8kHz sample rate
+  reg [8:0] sample_div;
   reg new_sample;
   
   reg [15:0] sfx_counter;
@@ -72,15 +72,16 @@ module audio (
       sfx_step_delta <= 32'd0;
       high_note_idx <= 3'd0;
     end else if (new_sample) begin
-      if (sfx_type == 0) begin
-        // priority: death > highscore > jump
-        if (event_death) begin
-          sfx_type <= 3'd2;
-          sfx_counter <= DEATH_TIME;
-          sfx_phase <= 32'd0;
-          sfx_step <= DEATH_START_FREQ;
-          sfx_step_delta <= DEATH_SWEEP_DELTA;
-        end else if (event_highscore) begin
+      // Death event can interrupt any sound
+      if (event_death) begin
+        sfx_type <= 3'd2;
+        sfx_counter <= DEATH_TIME;
+        sfx_phase <= 32'd0;
+        sfx_step <= DEATH_START_FREQ;
+        sfx_step_delta <= DEATH_SWEEP_DELTA;
+      end else if (sfx_type == 0) begin
+        // When idle, check for other events
+        if (event_highscore) begin
           sfx_type <= 3'd3;
           sfx_counter <= HIGH_NOTE1_TIME;
           sfx_phase <= 32'd0;
@@ -169,16 +170,16 @@ module audio (
   
   always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      sample_div <= 10'd0;
+      sample_div <= 9'd0;
       new_sample <= 1'b0;
       sigma_delta_accum <= 17'sd0;
       audio_pwm <= 1'b0;
     end else begin
-      if (sample_div >= 10'd1023) begin
-        sample_div <= 10'd0;
+      if (sample_div >= 9'd511) begin
+        sample_div <= 9'd0;
         new_sample <= 1'b1;
       end else begin
-        sample_div <= sample_div + 10'd1;
+        sample_div <= sample_div + 9'd1;
         new_sample <= 1'b0;
       end
       

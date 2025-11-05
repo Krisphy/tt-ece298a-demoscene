@@ -10,10 +10,10 @@ test/__pycache__/
 test/results.xml
 test/gate_level_netlist.v
 obj_dir/
-verilator/audio_*.wav
 verilator/obj_dir/
-verilator/obj_dir_audio/
 verilator/goosegame
 verilator/vgademo
-verilator/*.vcd
+verilator/audiotest
 verilator/test_audio
+verilator/*.vcd
+verilator/audio_*.wav

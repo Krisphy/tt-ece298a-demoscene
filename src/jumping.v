@@ -11,6 +11,7 @@ module jumping (
     
     input wire [23:0] speed,
     output reg [6:0] jump_pos,
+    output reg in_air,
 
     input wire game_rst,
     input wire clk,
@@ -19,7 +20,6 @@ module jumping (
 
 reg [23:0] ctr;
 reg [8:0] frame;
-reg in_air;
 
 reg [6:0] y_table[50:0];
 
