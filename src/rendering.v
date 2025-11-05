@@ -42,8 +42,8 @@ localparam GOOSE_HEIGHT = 40;
 localparam GOOSE_X = 50;
 localparam GOOSE_Y_BASE = 200;  // Ground level position
 
-// ION railway obstacle: 20x40 pixels
-localparam ION_WIDTH = 20;
+// ION railway obstacle: 30x40 pixels (front-view tram sprite)
+localparam ION_WIDTH = 30;
 localparam ION_HEIGHT = 40;
 
 // UW emblem obstacle: 30x30 pixels (square)
@@ -68,6 +68,7 @@ reg [1:0] layer_colors [4:0];  // Color for each layer (texture uses hardcoded w
 
 // Goose per-pixel colors (for shading)
 reg [1:0] goose_r, goose_g, goose_b;
+reg [1:0] tram_r, tram_g, tram_b;
 
 // Collision: goose hits any obstacle (ION railway or UW emblem only)
 assign collision = layers[0] & (layers[1] | layers[2]);
@@ -76,24 +77,24 @@ assign collision = layers[0] & (layers[1] | layers[2]);
 wire [1:0] final_r, final_g, final_b;
 assign final_r = (score_pixel ? 2'b11 :        // Score: black R=00 (highest priority)
                   layers[0] ? goose_r :        // Goose (with shading)
-                  layers[1] ? layer_colors[1] : // Obstacle
-                  layers[2] ? layer_colors[2] : // ION
+                  layers[1] ? tram_r :         // Tram obstacle (with colors)
+                  layers[2] ? layer_colors[2] : // UW emblem
                   layers[3] ? 2'b11 :           // Floor texture: white R=11
                   layers[4] ? 2'b01 :           // Floor: R=01
                   layers[5] ? 2'b00 : 2'b00);   // Sky: R=00
 
 assign final_g = (score_pixel ? 2'b11 :        // Score: black G=00 (highest priority)
                   layers[0] ? goose_g :        // Goose (with shading)
-                  layers[1] ? layer_colors[1] : // Obstacle
-                  layers[2] ? layer_colors[2] : // ION
+                  layers[1] ? tram_g :         // Tram obstacle (with colors)
+                  layers[2] ? layer_colors[2] : // UW emblem
                   layers[3] ? 2'b11 :           // Floor texture: white G=11
                   layers[4] ? 2'b01 :           // Floor: G=01
                   layers[5] ? 2'b11 : 2'b00);   // Sky: G=11
 
 assign final_b = (score_pixel ? 2'b11 :        // Score: black B=00 (highest priority)
                   layers[0] ? goose_b :        // Goose (with shading)
-                  layers[1] ? layer_colors[1] : // Obstacle
-                  layers[2] ? layer_colors[2] : // ION
+                  layers[1] ? tram_b :         // Tram obstacle (with colors)
+                  layers[2] ? layer_colors[2] : // UW emblem
                   layers[3] ? 2'b11 :           // Floor texture: white B=11
                   layers[4] ? 2'b01 :           // Floor: B=01
                   layers[5] ? 2'b11 : 2'b00);   // Sky: B=11
@@ -115,12 +116,21 @@ wire [4:0] goose_sprite_x;
 assign goose_sprite_y = (vaddr >= goose_y && vaddr < (goose_y + GOOSE_HEIGHT)) ? (vaddr - goose_y) : 6'd0;
 assign goose_sprite_x = (haddr >= GOOSE_X && haddr < (GOOSE_X + GOOSE_WIDTH)) ? (haddr - GOOSE_X) : 5'd0;
 
+// Tram sprite coordinates (for obstacle 1)
+wire [5:0] tram_sprite_y;
+wire [4:0] tram_sprite_x;
+assign tram_sprite_y = (vaddr >= (FLOOR_Y - ION_HEIGHT) && vaddr < FLOOR_Y) ? (vaddr - (FLOOR_Y - ION_HEIGHT)) : 6'd0;
+assign tram_sprite_x = (haddr >= obs1_x && haddr < (obs1_x + ION_WIDTH)) ? (haddr - obs1_x) : 5'd0;
+
 always @(posedge clk) begin
     if (sys_rst) begin
         layers <= 6'd0;
         goose_r <= 2'b00;
         goose_g <= 2'b00;
         goose_b <= 2'b00;
+        tram_r <= 2'b00;
+        tram_g <= 2'b00;
+        tram_b <= 2'b00;
     end
     else begin
         layers <= 6'd0;
@@ -134,6 +144,11 @@ always @(posedge clk) begin
         goose_r <= 2'b11;
         goose_g <= 2'b11;
         goose_b <= 2'b00;
+        
+        // Default tram colors (will be overridden if tram is drawn)
+        tram_r <= 2'b10;
+        tram_g <= 2'b10;
+        tram_b <= 2'b10;
 
         if (display_on) begin
             // Layer 5: Sky background (everything above ground)
@@ -293,20 +308,70 @@ always @(posedge clk) begin
                 end
             end
 
-            // Layer 1: First ION railway obstacle
+            // Layer 1: First ION railway obstacle (front-view tram sprite)
             if (obstacle_select[0]) begin
                 if (haddr >= obs1_x && haddr < (obs1_x + ION_WIDTH) &&
                     vaddr >= (FLOOR_Y - ION_HEIGHT) && vaddr < FLOOR_Y) begin
-                    // Draw ION obstacle based on type
-                    if (obstacle_type[0]) begin
-                        // Type 0: solid rectangle
+                    
+                    // Parametric tram rendering - front view of ION LRT (30x40 sprite)
+                    // Use tram_sprite_x (0-29) and tram_sprite_y (0-39) coordinates
+                    
+                    // Priority order: specific details over general areas
+                    
+                    // Headlights (white center): left x=8-10, y=26, right x=20-22, y=26
+                    if ((tram_sprite_y == 26) && 
+                             ((tram_sprite_x >= 8 && tram_sprite_x <= 10) || 
+                              (tram_sprite_x >= 20 && tram_sprite_x <= 22))) begin
                         layers[1] <= 1'b1;
+                        tram_r <= 2'b11; tram_g <= 2'b11; tram_b <= 2'b11; // White headlights
                     end
-                    else begin
-                        // Type 1: dashed rectangle
-                        if (vaddr[2:0] < 3'd4) begin
-                            layers[1] <= 1'b1;
-                        end
+                    // Coupler recess (dark notch center): x=14..16, y=30..34
+                    else if ((tram_sprite_y >= 30 && tram_sprite_y <= 34) && 
+                             (tram_sprite_x >= 14 && tram_sprite_x <= 16)) begin
+                        layers[1] <= 1'b1;
+                        tram_r <= 2'b00; tram_g <= 2'b00; tram_b <= 2'b01; // Dark gray #000055
+                    end
+                    // Blue accent blades - left side: x=3..4, y=8..28
+                    else if ((tram_sprite_y >= 8 && tram_sprite_y <= 28) && 
+                             (tram_sprite_x >= 3 && tram_sprite_x <= 4)) begin
+                        layers[1] <= 1'b1;
+                        tram_r <= 2'b00; tram_g <= 2'b01; tram_b <= 2'b11; // ION blue #0055FF
+                    end
+                    // Blue accent blades - right side: x=25..26, y=8..28
+                    else if ((tram_sprite_y >= 8 && tram_sprite_y <= 28) && 
+                             (tram_sprite_x >= 25 && tram_sprite_x <= 26)) begin
+                        layers[1] <= 1'b1;
+                        tram_r <= 2'b00; tram_g <= 2'b01; tram_b <= 2'b11; // ION blue #0055FF
+                    end
+                    // Windshield glass mask (black): x=5..24, y=6..24
+                    else if ((tram_sprite_y >= 6 && tram_sprite_y <= 24) && 
+                             (tram_sprite_x >= 5 && tram_sprite_x <= 24)) begin
+                        layers[1] <= 1'b1;
+                        tram_r <= 2'b00; tram_g <= 2'b00; tram_b <= 2'b00; // Black glass
+                    end
+                    // White body extends to ground: x=4..26, y=25..39
+                    else if ((tram_sprite_y >= 25 && tram_sprite_y <= 39) && 
+                             (tram_sprite_x >= 4 && tram_sprite_x <= 26)) begin
+                        layers[1] <= 1'b1;
+                        tram_r <= 2'b11; tram_g <= 2'b11; tram_b <= 2'b11; // White body
+                    end
+                    // Roof equipment box (pantograph base): x=12..17, y=2..4
+                    else if ((tram_sprite_y >= 2 && tram_sprite_y <= 4) && 
+                             (tram_sprite_x >= 12 && tram_sprite_x <= 17)) begin
+                        layers[1] <= 1'b1;
+                        tram_r <= 2'b10; tram_g <= 2'b10; tram_b <= 2'b10; // Mid gray #AAAAAA
+                    end
+                    // Upper body/roof: x=5..24, y=0..5 (ION blue top)
+                    else if ((tram_sprite_y <= 5) && 
+                             (tram_sprite_x >= 5 && tram_sprite_x <= 24)) begin
+                        layers[1] <= 1'b1;
+                        tram_r <= 2'b00; tram_g <= 2'b01; tram_b <= 2'b11; // ION blue #0055FF
+                    end
+                    // Bottom edge/shadow line: x=5..24, y=39 (thin dark line at ground)
+                    else if ((tram_sprite_y == 39) && 
+                             (tram_sprite_x >= 5 && tram_sprite_x <= 24)) begin
+                        layers[1] <= 1'b1;
+                        tram_r <= 2'b01; tram_g <= 2'b01; tram_b <= 2'b01; // Dark gray shadow
                     end
                 end
             end
