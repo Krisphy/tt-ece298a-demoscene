@@ -36,7 +36,7 @@ module rendering (
 );
 
 // Simple sprite definitions using rectangles
-// Goose sprite: 30x40 pixels (simple rectangle)
+// Goose sprite: 30x40 pixels (goose-shaped sprite)
 localparam GOOSE_WIDTH = 30;
 localparam GOOSE_HEIGHT = 40;
 localparam GOOSE_X = 50;
@@ -66,13 +66,16 @@ reg [189:0] digits[52:0];  // Digit ROM - 19 pixels wide x 53 pixels tall for ea
 reg [5:0] layers;  // [0]=goose, [1]=ION, [2]=UW emblem, [3]=floor_texture, [4]=floor, [5]=sky
 reg [1:0] layer_colors [4:0];  // Color for each layer (texture uses hardcoded white)
 
+// Goose per-pixel colors (for shading)
+reg [1:0] goose_r, goose_g, goose_b;
+
 // Collision: goose hits any obstacle (ION railway or UW emblem only)
 assign collision = layers[0] & (layers[1] | layers[2]);
 
 // Composite all layers with colors (priority order: score, goose, obstacles, ION, floor texture, floor, sky)
 wire [1:0] final_r, final_g, final_b;
 assign final_r = (score_pixel ? 2'b11 :        // Score: black R=00 (highest priority)
-                  layers[0] ? layer_colors[0] : // Goose
+                  layers[0] ? goose_r :        // Goose (with shading)
                   layers[1] ? layer_colors[1] : // Obstacle
                   layers[2] ? layer_colors[2] : // ION
                   layers[3] ? 2'b11 :           // Floor texture: white R=11
@@ -80,7 +83,7 @@ assign final_r = (score_pixel ? 2'b11 :        // Score: black R=00 (highest pri
                   layers[5] ? 2'b00 : 2'b00);   // Sky: R=00
 
 assign final_g = (score_pixel ? 2'b11 :        // Score: black G=00 (highest priority)
-                  layers[0] ? 2'b11 :           // Goose is green
+                  layers[0] ? goose_g :        // Goose (with shading)
                   layers[1] ? layer_colors[1] : // Obstacle
                   layers[2] ? layer_colors[2] : // ION
                   layers[3] ? 2'b11 :           // Floor texture: white G=11
@@ -88,7 +91,7 @@ assign final_g = (score_pixel ? 2'b11 :        // Score: black G=00 (highest pri
                   layers[5] ? 2'b11 : 2'b00);   // Sky: G=11
 
 assign final_b = (score_pixel ? 2'b11 :        // Score: black B=00 (highest priority)
-                  layers[0] ? 2'b00 :           // Goose
+                  layers[0] ? goose_b :        // Goose (with shading)
                   layers[1] ? layer_colors[1] : // Obstacle
                   layers[2] ? layer_colors[2] : // ION
                   layers[3] ? 2'b11 :           // Floor texture: white B=11
@@ -106,9 +109,18 @@ wire [10:0] obs1_x = 11'd640 - scrolladdr;      // Start at right, move left
 wire [10:0] obs2_x = 11'd640 - scrolladdr + 11'd250;
 wire [10:0] obs3_x = 11'd640 - scrolladdr + 11'd450;
 
+// Goose sprite coordinates (for color calculation)
+wire [5:0] goose_sprite_y;
+wire [4:0] goose_sprite_x;
+assign goose_sprite_y = (vaddr >= goose_y && vaddr < (goose_y + GOOSE_HEIGHT)) ? (vaddr - goose_y) : 6'd0;
+assign goose_sprite_x = (haddr >= GOOSE_X && haddr < (GOOSE_X + GOOSE_WIDTH)) ? (haddr - GOOSE_X) : 5'd0;
+
 always @(posedge clk) begin
     if (sys_rst) begin
         layers <= 6'd0;
+        goose_r <= 2'b00;
+        goose_g <= 2'b00;
+        goose_b <= 2'b00;
     end
     else begin
         layers <= 6'd0;
@@ -117,6 +129,11 @@ always @(posedge clk) begin
         layer_colors[0] <= 2'b11;  // Goose - yellow/white
         layer_colors[1] <= 2'b01;  // Obstacle - red
         layer_colors[2] <= 2'b11;  // ION - blue
+        
+        // Default goose colors (will be overridden if goose is drawn)
+        goose_r <= 2'b11;
+        goose_g <= 2'b11;
+        goose_b <= 2'b00;
 
         if (display_on) begin
             // Layer 5: Sky background (everything above ground)
@@ -134,19 +151,145 @@ always @(posedge clk) begin
                 layers[3] <= floor[vaddr - FLOOR_Y][flooraddr];
             end
             
-            // Layer 0: Goose (simple rectangle)
+            // Layer 0: Goose (parametric Canadian goose sprite)
             if (haddr >= GOOSE_X && haddr < (GOOSE_X + GOOSE_WIDTH) &&
                 vaddr >= goose_y && vaddr < (goose_y + GOOSE_HEIGHT) &&
                 game_start_blink) begin
                 
-                if (game_over) begin
-                    // Dead goose - change color to red
+                // Part detection using goose_sprite_x and goose_sprite_y
+                // Beak: rows 13-14, cols 27-28
+                if ((goose_sprite_y >= 13 && goose_sprite_y <= 14) && 
+                    (goose_sprite_x >= 27 && goose_sprite_x <= 28)) begin
                     layers[0] <= 1'b1;
-                    layer_colors[0] <= 2'b11;  // Red when dead
+                    if (game_over) begin
+                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00; // Red when dead
+                    end else begin
+                        goose_r <= 2'b11; goose_g <= 2'b10; goose_b <= 2'b01; // Orange beak
+                    end
                 end
-                else begin
-                    // Alive goose - draw simple rectangle
+                // Eye: rows 12-13, col 24
+                else if (((goose_sprite_y == 12) || (goose_sprite_y == 13)) && (goose_sprite_x == 24)) begin
                     layers[0] <= 1'b1;
+                    if (game_over) begin
+                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00; // Red when dead
+                    end else begin
+                        goose_r <= 2'b11; goose_g <= 2'b11; goose_b <= 2'b11; // White eye
+                    end
+                end
+                // Cheek patch: rows 13-14, cols 22-23
+                else if ((goose_sprite_y >= 13 && goose_sprite_y <= 14) && 
+                         (goose_sprite_x >= 22 && goose_sprite_x <= 23)) begin
+                    layers[0] <= 1'b1;
+                    if (game_over) begin
+                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00; // Red when dead
+                    end else begin
+                        goose_r <= 2'b11; goose_g <= 2'b11; goose_b <= 2'b11; // White cheek
+                    end
+                end
+                // Belly: rows 34-35, cols 12-18
+                else if ((goose_sprite_y >= 34 && goose_sprite_y <= 35) && 
+                         (goose_sprite_x >= 12 && goose_sprite_x <= 18)) begin
+                    layers[0] <= 1'b1;
+                    if (game_over) begin
+                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00; // Red when dead
+                    end else begin
+                        goose_r <= 2'b11; goose_g <= 2'b11; goose_b <= 2'b11; // White belly
+                    end
+                end
+                // Head (excluding beak, eye, cheek): rows 11-16, cols 22-26
+                else if ((goose_sprite_y >= 11 && goose_sprite_y <= 16) &&
+                         (goose_sprite_x >= 22 && goose_sprite_x <= 26)) begin
+                    layers[0] <= 1'b1;
+                    if (game_over) begin
+                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00; // Red when dead
+                    end else begin
+                        goose_r <= 2'b00; goose_g <= 2'b00; goose_b <= 2'b00; // Black head
+                    end
+                end
+                // Neck: 2px wide S-curve from rows 17-24
+                else if (((goose_sprite_y >= 17 && goose_sprite_y <= 18) && (goose_sprite_x >= 20 && goose_sprite_x <= 21)) ||
+                         ((goose_sprite_y >= 19 && goose_sprite_y <= 20) && (goose_sprite_x >= 19 && goose_sprite_x <= 20)) ||
+                         ((goose_sprite_y >= 21 && goose_sprite_y <= 22) && (goose_sprite_x >= 18 && goose_sprite_x <= 19)) ||
+                         ((goose_sprite_y >= 23 && goose_sprite_y <= 24) && (goose_sprite_x >= 17 && goose_sprite_x <= 18))) begin
+                    layers[0] <= 1'b1;
+                    if (game_over) begin
+                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00; // Red when dead
+                    end else begin
+                        goose_r <= 2'b00; goose_g <= 2'b00; goose_b <= 2'b00; // Black neck
+                    end
+                end
+                // Wing leading edge (black): specific leftmost pixels at rows 14-24
+                else if (((goose_sprite_y == 14) && (goose_sprite_x == 6)) ||
+                         ((goose_sprite_y == 15) && (goose_sprite_x == 6)) ||
+                         ((goose_sprite_y == 16) && (goose_sprite_x == 7)) ||
+                         ((goose_sprite_y == 17) && (goose_sprite_x == 8)) ||
+                         ((goose_sprite_y == 18) && (goose_sprite_x == 9)) ||
+                         ((goose_sprite_y == 19) && (goose_sprite_x == 10)) ||
+                         ((goose_sprite_y == 20) && (goose_sprite_x == 10)) ||
+                         ((goose_sprite_y == 21) && (goose_sprite_x == 10)) ||
+                         ((goose_sprite_y == 22) && (goose_sprite_x == 10)) ||
+                         ((goose_sprite_y == 23) && (goose_sprite_x == 10)) ||
+                         ((goose_sprite_y == 24) && (goose_sprite_x == 10))) begin
+                    layers[0] <= 1'b1;
+                    if (game_over) begin
+                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00; // Red when dead
+                    end else begin
+                        goose_r <= 2'b00; goose_g <= 2'b00; goose_b <= 2'b00; // Black leading edge
+                    end
+                end
+                // Legs: rows 36-39, cols 12 or 15
+                else if ((goose_sprite_y >= 36 && goose_sprite_y <= 39) && 
+                         ((goose_sprite_x == 12) || (goose_sprite_x == 15))) begin
+                    layers[0] <= 1'b1;
+                    if (game_over) begin
+                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00; // Red when dead
+                    end else begin
+                        goose_r <= 2'b00; goose_g <= 2'b00; goose_b <= 2'b00; // Black legs
+                    end
+                end
+                // Tail: rows 29-34, cols 6-9 (triangle extending from body)
+                else if (((goose_sprite_y == 29) && (goose_sprite_x >= 6 && goose_sprite_x <= 7)) ||
+                         ((goose_sprite_y == 30) && (goose_sprite_x >= 6 && goose_sprite_x <= 7)) ||
+                         ((goose_sprite_y == 31) && (goose_sprite_x >= 6 && goose_sprite_x <= 7)) ||
+                         ((goose_sprite_y == 32) && (goose_sprite_x >= 6 && goose_sprite_x <= 8)) ||
+                         ((goose_sprite_y == 33) && (goose_sprite_x >= 6 && goose_sprite_x <= 8)) ||
+                         ((goose_sprite_y == 34) && (goose_sprite_x >= 6 && goose_sprite_x <= 7))) begin
+                    layers[0] <= 1'b1;
+                    if (game_over) begin
+                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00; // Red when dead
+                    end else begin
+                        goose_r <= 2'b10; goose_g <= 2'b01; goose_b <= 2'b00; // Dark brown tail (same as body)
+                    end
+                end
+                // Wing (brown): raised diagonal triangle extending down to body
+                else if (((goose_sprite_y == 14) && (goose_sprite_x >= 6 && goose_sprite_x <= 8)) ||
+                         ((goose_sprite_y == 15) && (goose_sprite_x >= 6 && goose_sprite_x <= 9)) ||
+                         ((goose_sprite_y == 16) && (goose_sprite_x >= 7 && goose_sprite_x <= 10)) ||
+                         ((goose_sprite_y == 17) && (goose_sprite_x >= 8 && goose_sprite_x <= 11)) ||
+                         ((goose_sprite_y == 18) && (goose_sprite_x >= 9 && goose_sprite_x <= 12)) ||
+                         ((goose_sprite_y == 19) && (goose_sprite_x >= 10 && goose_sprite_x <= 13)) ||
+                         ((goose_sprite_y == 20) && (goose_sprite_x >= 10 && goose_sprite_x <= 14)) ||
+                         ((goose_sprite_y == 21) && (goose_sprite_x >= 10 && goose_sprite_x <= 15)) ||
+                         ((goose_sprite_y == 22) && (goose_sprite_x >= 10 && goose_sprite_x <= 16)) ||
+                         ((goose_sprite_y == 23) && (goose_sprite_x >= 10 && goose_sprite_x <= 17)) ||
+                         ((goose_sprite_y == 24) && (goose_sprite_x >= 10 && goose_sprite_x <= 18))) begin
+                    layers[0] <= 1'b1;
+                    if (game_over) begin
+                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00; // Red when dead
+                    end else begin
+                        goose_r <= 2'b10; goose_g <= 2'b10; goose_b <= 2'b01; // Brown wing (more green for brown)
+                    end
+                end
+                // Body: elongated horizontal wedge/oval
+                else if (((goose_sprite_y >= 25 && goose_sprite_y <= 28) && (goose_sprite_x >= 10 && goose_sprite_x <= 22)) ||
+                         ((goose_sprite_y >= 29 && goose_sprite_y <= 32) && (goose_sprite_x >= 9 && goose_sprite_x <= 22)) ||
+                         ((goose_sprite_y >= 33 && goose_sprite_y <= 35) && (goose_sprite_x >= 9 && goose_sprite_x <= 21))) begin
+                    layers[0] <= 1'b1;
+                    if (game_over) begin
+                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00; // Red when dead
+                    end else begin
+                        goose_r <= 2'b10; goose_g <= 2'b10; goose_b <= 2'b01; // Brown body (more green, less red)
+                    end
                 end
             end
 
