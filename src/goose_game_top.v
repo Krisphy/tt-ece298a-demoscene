@@ -79,8 +79,10 @@ module tt_um_goose_game(
   wire [4:0] random;
   
   // From audio
-  wire audio_pwm;
-  wire signed [15:0] audio_sample;  // For testbench/debug (unused in hardware)
+  // wire audio_pwm;
+  // wire signed [15:0] audio_sample;  // For testbench/debug (unused in hardware)
+  wire audio_pwm = 1'b0;  // Audio disabled for final build
+  wire signed [15:0] audio_sample = 16'sd0;  // Audio disabled for final build
 
   // ============================================================================
   // Output Assignments
@@ -90,7 +92,8 @@ module tt_um_goose_game(
   assign uo_out = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
 
   // Audio PWM output on uio[7] (A_PWM per proposal)
-  assign uio_out[7] = audio_pwm;
+  // Audio disabled for final build to reduce utilization
+  assign uio_out[7] = 1'b0;  // audio_pwm;
   assign uio_out[6:0] = 7'b0;
   assign uio_oe[7] = 1'b1;
   assign uio_oe[6:0] = 7'b0;
@@ -189,6 +192,8 @@ module tt_um_goose_game(
   );
 
   // Audio Controller
+  // Audio disabled for final build to reduce utilization
+  /*
   audio audio_ctrl(
     .clk(clk),
     .rst_n(rst_n),
@@ -199,6 +204,7 @@ module tt_um_goose_game(
     .audio_pwm(audio_pwm),
     .audio_sample(audio_sample)
   );
+  */
 
 endmodule
 
