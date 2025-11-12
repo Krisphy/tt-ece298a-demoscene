@@ -57,8 +57,9 @@ localparam FLOOR_HEIGHT = 5;
 // Ground texture from dinogame (6 rows, 256 bits each)
 reg [255:0] floor[5:0];
 
-// Score rendering (display only, score counting is in game_controller)
-reg [3:0] score_saved[3:0];
+// Score rendering - DISABLED FOR SIZE REDUCTION
+// (score tracking also disabled in game_controller)
+// reg [3:0] score_saved[3:0];  // Commented out - no longer needed
 reg score_pixel;
 
 // Layer outputs (priority order: 0=highest, 5=lowest)
@@ -554,18 +555,20 @@ always @(posedge clk) begin
     end
 end
 
-// Score rendering logic - displays in upper right corner
-// Score value comes from game_controller (score_in)
+// Score rendering logic - DISABLED FOR SIZE REDUCTION
+// Score tracking and display both disabled
 always @(posedge clk) begin
     // Score rendering disabled to reduce utilization
-    // Can be re-enabled with a simpler font implementation if needed
+    // Score tracking also disabled in game_controller
     score_pixel <= 1'b0;
     
-    // Extract BCD digits from score_in (still needed for game logic)
+    // Score extraction no longer needed (score_saved array commented out)
+    /*
     score_saved[3] <= score_in[15:12];
     score_saved[2] <= score_in[11:8];
     score_saved[1] <= score_in[7:4];
     score_saved[0] <= score_in[3:0];
+    */
 end
 
 // Ground texture initialization (from dinogame-tt05)

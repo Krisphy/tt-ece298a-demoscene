@@ -61,9 +61,14 @@ assign game_halt = game_over || halt_button || (start_ctr < START_TIME);
 assign game_start_blink = (start_ctr >= START_TIME) || start_ctr[22] || game_over;
 
 // ============================================================================
-// Score Tracking
+// Score Tracking - DISABLED FOR SIZE REDUCTION
 // ============================================================================
 
+// Score tracking disabled to reduce utilization
+// Saves ~40 lines of BCD counter logic + 22-bit counter + 4x4-bit BCD storage
+assign score_out = 16'h0000;
+
+/*
 localparam SCORE_INC_TIME = 2517500;  // ~100ms at 25MHz
 
 reg [21:0] score_ctr;
@@ -102,6 +107,7 @@ always @(posedge clk) begin
         end
     end
 end
+*/
 
 // ============================================================================
 // Obstacle State Management
