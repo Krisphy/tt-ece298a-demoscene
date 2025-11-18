@@ -160,9 +160,16 @@ always @(posedge clk) begin
 end
 
 // ============================================================================
-// Audio Event Generation
+// Audio Event Generation - DISABLED FOR SIZE REDUCTION
 // ============================================================================
 
+// Audio disabled to reduce utilization
+// Saves ~38 lines of event pulse generation + 4 registers (event_jump_ctr, event_death_ctr, event_jump_prev, collision_prev)
+assign event_jump = 1'b0;
+assign event_death = 1'b0;
+assign event_highscore = 1'b0;
+
+/*
 reg [9:0] event_jump_ctr;
 reg [9:0] event_death_ctr;
 reg event_jump_prev;
@@ -197,6 +204,7 @@ always @(posedge clk) begin
         collision_prev <= collision;
     end
 end
+*/
 
 // ============================================================================
 // Game State FSM
