@@ -2,10 +2,8 @@
  * Goose Game - Chrome Dino style game for Tiny Tapeout
  * 
  * Top-level module that instantiates and connects all submodules:
- * - Input Controller (button handling)
- * - Game Controller (game state, score, obstacles)
+ * - Game Controller (game state, obstacles)
  * - Video Controller (rendering)
- * - Audio Controller (sound effects)
  * - Jump Physics
  * - Scroll Logic
  * - VGA Sync Generator
@@ -59,10 +57,6 @@ module tt_um_goose_game(
   wire game_running;
   wire [1:0] obstacle_select;
   wire [1:0] obstacle_type;
-  wire [15:0] score;
-  wire event_jump;
-  wire event_death;
-  wire event_highscore;
   
   // From jumping
   wire [6:0] jump_pos;
@@ -77,12 +71,6 @@ module tt_um_goose_game(
   
   // From rng
   wire [4:0] random;
-  
-  // From audio
-  // wire audio_pwm;
-  // wire signed [15:0] audio_sample;  // For testbench/debug (unused in hardware)
-  wire audio_pwm = 1'b0;  // Audio disabled for final build
-  wire signed [15:0] audio_sample = 16'sd0;  // Audio disabled for final build
 
   // ============================================================================
   // Output Assignments
@@ -91,15 +79,12 @@ module tt_um_goose_game(
   // TinyVGA PMOD output
   assign uo_out = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
 
-  // Audio PWM output on uio[7] (A_PWM per proposal)
-  // Audio disabled for final build to reduce utilization
-  assign uio_out[7] = 1'b0;  // audio_pwm;
-  assign uio_out[6:0] = 7'b0;
-  assign uio_oe[7] = 1'b1;
-  assign uio_oe[6:0] = 7'b0;
+  // Bidirectional pins unused
+  assign uio_out = 8'b0;
+  assign uio_oe = 8'b0;
 
   // Suppress unused signals warning
-  wire _unused_ok = &{ena, ui_in[7:2], uio_in, audio_sample, speed};
+  wire _unused_ok = &{ena, ui_in[7:2], uio_in, speed};
 
   // ============================================================================
   // Module Instantiations
@@ -132,11 +117,7 @@ module tt_um_goose_game(
     .game_start_blink(game_start_blink),
     .game_running(game_running),
     .obstacle_select(obstacle_select),
-    .obstacle_type(obstacle_type),
-    .score_out(score),
-    .event_jump(event_jump),
-    .event_death(event_death),
-    .event_highscore(event_highscore)
+    .obstacle_type(obstacle_type)
   );
 
   // Jump physics
@@ -181,7 +162,6 @@ module tt_um_goose_game(
     .game_start_blink(game_start_blink),
     .obstacle_select(obstacle_select),
     .obstacle_type(obstacle_type),
-    .score_in(score),
     .jump_pos(jump_pos),
     .vaddr(vpos),
     .haddr(hpos),
@@ -190,21 +170,6 @@ module tt_um_goose_game(
     .clk(clk),
     .sys_rst(~rst_n)
   );
-
-  // Audio Controller
-  // Audio disabled for final build to reduce utilization
-  /*
-  audio audio_ctrl(
-    .clk(clk),
-    .rst_n(rst_n),
-    .event_jump(event_jump),
-    .event_death(event_death),
-    .event_highscore(event_highscore),
-    .game_running(game_running),
-    .audio_pwm(audio_pwm),
-    .audio_sample(audio_sample)
-  );
-  */
 
 endmodule
 

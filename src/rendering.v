@@ -5,7 +5,6 @@
  * - Sprite storage and layer compositing
  * - Pixel-by-pixel rendering
  * - Color palette management
- * - Score display rendering
  * - Collision detection (combinational)
  * 
  * No game state logic - all state comes from game_controller
@@ -24,7 +23,6 @@ module rendering (
 
     input wire [1:0] obstacle_select,  // From game_controller
     input wire [1:0] obstacle_type,
-    input wire [15:0] score_in,        // From game_controller
     input wire [6:0] jump_pos,
     input wire [9:0] vaddr,
     input wire [9:0] haddr,
@@ -57,11 +55,6 @@ localparam FLOOR_HEIGHT = 5;
 // Ground texture from dinogame (6 rows, 256 bits each)
 reg [255:0] floor[5:0];
 
-// Score rendering - DISABLED FOR SIZE REDUCTION
-// (score tracking also disabled in game_controller)
-// reg [3:0] score_saved[3:0];  // Commented out - no longer needed
-reg score_pixel;
-
 // Layer outputs (priority order: 0=highest, 5=lowest)
 reg [5:0] layers;  // [0]=goose, [1]=ION, [2]=UW emblem, [3]=floor_texture, [4]=floor, [5]=sky
 reg [1:0] layer_colors [4:0];  // Color for each layer (texture uses hardcoded white)
@@ -74,26 +67,23 @@ reg [1:0] emblem_r, emblem_g, emblem_b;
 // Collision: goose hits any obstacle (ION railway or UW emblem only)
 assign collision = layers[0] & (layers[1] | layers[2]);
 
-// Composite all layers with colors (priority order: score, goose, obstacles, ION, floor texture, floor, sky)
+// Composite all layers with colors (priority order: goose, obstacles, ION, floor texture, floor, sky)
 wire [1:0] final_r, final_g, final_b;
-assign final_r = (score_pixel ? 2'b11 :        // Score: black R=00 (highest priority)
-                  layers[0] ? goose_r :        // Goose (with shading)
+assign final_r = (layers[0] ? goose_r :        // Goose (with shading)
                   layers[1] ? tram_r :         // Tram obstacle (with colors)
                   layers[2] ? emblem_r :       // UW emblem (with colors)
                   layers[3] ? 2'b11 :           // Floor texture: white R=11
                   layers[4] ? 2'b01 :           // Floor: R=01
                   layers[5] ? 2'b00 : 2'b00);   // Sky: R=00
 
-assign final_g = (score_pixel ? 2'b11 :        // Score: black G=00 (highest priority)
-                  layers[0] ? goose_g :        // Goose (with shading)
+assign final_g = (layers[0] ? goose_g :        // Goose (with shading)
                   layers[1] ? tram_g :         // Tram obstacle (with colors)
                   layers[2] ? emblem_g :       // UW emblem (with colors)
                   layers[3] ? 2'b11 :           // Floor texture: white G=11
                   layers[4] ? 2'b01 :           // Floor: G=01
                   layers[5] ? 2'b11 : 2'b00);   // Sky: G=11
 
-assign final_b = (score_pixel ? 2'b11 :        // Score: black B=00 (highest priority)
-                  layers[0] ? goose_b :        // Goose (with shading)
+assign final_b = (layers[0] ? goose_b :        // Goose (with shading)
                   layers[1] ? tram_b :         // Tram obstacle (with colors)
                   layers[2] ? emblem_b :       // UW emblem (with colors)
                   layers[3] ? 2'b11 :           // Floor texture: white B=11
@@ -553,22 +543,6 @@ always @(posedge clk) begin
             end
         end
     end
-end
-
-// Score rendering logic - DISABLED FOR SIZE REDUCTION
-// Score tracking and display both disabled
-always @(posedge clk) begin
-    // Score rendering disabled to reduce utilization
-    // Score tracking also disabled in game_controller
-    score_pixel <= 1'b0;
-    
-    // Score extraction no longer needed (score_saved array commented out)
-    /*
-    score_saved[3] <= score_in[15:12];
-    score_saved[2] <= score_in[11:8];
-    score_saved[1] <= score_in[7:4];
-    score_saved[0] <= score_in[3:0];
-    */
 end
 
 // Ground texture initialization (from dinogame-tt05)

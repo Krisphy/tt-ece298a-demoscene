@@ -39,25 +39,15 @@ GOOSE_SOURCES = $(SRC_DIR)/goose_game_top.v \
 VGADEMO_SOURCES = $(SRC_DIR)/vga_example.v \
                   $(SRC_DIR)/hvsync_generator.v
 
-# Audio test sources
-AUDIO_SOURCES = $(SRC_DIR)/audio.v
-
-# Build targets (audio removed)
+# Build targets
 all: goosegame vgademo
 
-# Goose game without audio (faster, simpler)
+# Goose game
 goosegame: $(GOOSE_SOURCES) goosegame_tb.cpp
 	$(VERILATOR) $(VERILATOR_FLAGS) $^ \
-		-CFLAGS "-std=c++14 -g -O3 -DNO_AUDIO $(SDL2_CFLAGS)" --LDFLAGS "$(SDL2_LDFLAGS)" --top-module tt_um_goose_game
+		-CFLAGS "-std=c++14 -g -O3 $(SDL2_CFLAGS)" --LDFLAGS "$(SDL2_LDFLAGS)" --top-module tt_um_goose_game
 	$(MAKE) -C obj_dir -f Vtt_um_goose_game.mk
 	cp obj_dir/Vtt_um_goose_game goosegame
-
-# Goose game with audio playback and event logging - DISABLED (audio removed)
-# goosegame-audio: $(GOOSE_SOURCES) goosegame_tb.cpp
-# 	$(VERILATOR) $(VERILATOR_FLAGS) $^ \
-# 		-CFLAGS "-std=c++14 -g -O3 -DWITH_AUDIO $(SDL2_CFLAGS)" --LDFLAGS "$(SDL2_LDFLAGS)" --top-module tt_um_goose_game
-# 	$(MAKE) -C obj_dir -f Vtt_um_goose_game.mk
-# 	cp obj_dir/Vtt_um_goose_game goosegame-audio
 
 vgademo: $(VGADEMO_SOURCES) vgademo_tb.cpp
 	$(VERILATOR) $(VERILATOR_FLAGS) $^ \
@@ -65,24 +55,10 @@ vgademo: $(VGADEMO_SOURCES) vgademo_tb.cpp
 	$(MAKE) -C obj_dir -f Vtt_um_vga_example.mk
 	cp obj_dir/Vtt_um_vga_example vgademo
 
-# Audio test with real-time playback via SDL2 - DISABLED (audio removed)
-# audiotest-play: audiotest_tb.cpp $(AUDIO_SOURCES)
-# 	$(VERILATOR) $(VERILATOR_FLAGS) $^ \
-# 		-CFLAGS "-std=c++14 -g -O3 $(SDL2_CFLAGS)" --LDFLAGS "$(SDL2_LDFLAGS)" --top-module audio
-# 	$(MAKE) -C obj_dir -f Vaudio.mk
-# 	cp obj_dir/Vaudio audiotest-play
-
-# Audio test that generates WAV files (no real-time playback) - DISABLED (audio removed)
-# audiotest-wav: test_audio_verilator.cpp $(AUDIO_SOURCES)
-# 	$(VERILATOR) -Wall -Wno-UNUSED --cc --exe --build \
-# 		$(AUDIO_SOURCES) test_audio_verilator.cpp \
-# 		--top-module audio -CFLAGS -std=c++14
-# 	cp obj_dir/Vaudio audiotest-wav
-
 clean:
 	rm -rf obj_dir
-	rm -f goosegame goosegame-audio vgademo audiotest-play audiotest-wav
-	rm -f *.vcd audio_*.wav
+	rm -f goosegame vgademo
+	rm -f *.vcd
 
 # Run targets
 run: goosegame
@@ -92,18 +68,5 @@ run: goosegame
 run-demo: vgademo
 	@echo "Running VGA demo..."
 	./vgademo
-
-# Audio-related run targets - DISABLED (audio removed)
-# run-audio: goosegame-audio
-# 	@echo "Running goose game with audio and event logging..."
-# 	./goosegame-audio
-
-# run-audiotest-play: audiotest-play
-# 	@echo "Running audio test with real-time playback..."
-# 	./audiotest-play
-
-# run-audiotest-wav: audiotest-wav
-# 	@echo "Running audio test (generates WAV files)..."
-# 	./audiotest-wav
 
 .PHONY: all clean run run-demo

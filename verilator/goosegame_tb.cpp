@@ -11,7 +11,6 @@
 #define V_TOTAL 525
 #define V_DISPLAY 480
 
-
 static inline uint32_t expand_2bit(uint32_t x) {
   // Expand 2-bit color to 8-bit
   // 00 -> 00000000 (0)
@@ -20,37 +19,6 @@ static inline uint32_t expand_2bit(uint32_t x) {
   // 11 -> 11111111 (255)
   return (x << 6) | (x << 4) | (x << 2) | x;
 }
-
-#ifdef WITH_AUDIO
-// Audio sample buffer (ring buffer)
-#define AUDIO_BUFFER_SIZE 2048  // ~42ms buffer at 48.8kHz
-uint16_t audio_buffer[AUDIO_BUFFER_SIZE];
-volatile int audio_write_pos = 0;
-volatile int audio_read_pos = 0;
-
-// Initialize buffer with silence
-void init_audio_buffer() {
-  for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-    audio_buffer[i] = 0x8000;  // Silence in unsigned 16-bit
-  }
-}
-
-// SDL audio callback - reads from pre-generated buffer
-void audio_callback(void* userdata, uint8_t* stream, int len) {
-  uint16_t *stream16 = (uint16_t*) stream;
-  
-  // Read samples from buffer
-  for (int i = 0; i < len/2; i++) {
-    if (audio_read_pos != audio_write_pos) {
-      stream16[i] = audio_buffer[audio_read_pos];
-      audio_read_pos = (audio_read_pos + 1) % AUDIO_BUFFER_SIZE;
-    } else {
-      // Buffer underrun - output silence
-      stream16[i] = 0x8000;
-    }
-  }
-}
-#endif
 
 int main(int argc, char** argv) {
   Verilated::commandArgs(argc, argv);
@@ -69,11 +37,6 @@ int main(int argc, char** argv) {
   top->rst_n = 1;
   top->clk = 0; top->eval();
   
-#ifdef WITH_AUDIO
-  // Initialize audio buffer with silence
-  init_audio_buffer();
-#endif
-  
   // Run one warmup frame to synchronize VGA counters
   for(int warmup = 0; warmup < H_TOTAL * V_TOTAL; warmup++) {
     top->clk = 0; top->eval();
@@ -81,27 +44,15 @@ int main(int argc, char** argv) {
   }
 
   // Initialize SDL
-#ifdef WITH_AUDIO
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
-    SDL_Log("Failed to initialize SDL: %s", SDL_GetError());
-    return 1;
-  }
-  SDL_Log("Running with audio playback and event logging enabled");
-#else
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     SDL_Log("Failed to initialize SDL: %s", SDL_GetError());
     return 1;
   }
-#endif
   
   SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 
   // Create window
-#ifdef WITH_AUDIO
-  SDL_Window* window = SDL_CreateWindow("Goose Game (with Audio) - Jump with SPACE",
-#else
   SDL_Window* window = SDL_CreateWindow("Goose Game - Jump with SPACE",
-#endif 
                                         SDL_WINDOWPOS_UNDEFINED, 
                                         SDL_WINDOWPOS_UNDEFINED, 
                                         H_DISPLAY, V_DISPLAY, 0);
@@ -131,30 +82,6 @@ int main(int argc, char** argv) {
     SDL_Quit();
     return 1;
   }
-
-#ifdef WITH_AUDIO
-  // Setup audio device
-  SDL_AudioSpec desiredSpec, obtainedSpec;
-  desiredSpec.freq = 48000;  // Target 48kHz sample rate
-  desiredSpec.format = AUDIO_U16;
-  desiredSpec.channels = 1;
-  desiredSpec.samples = 2048;
-  desiredSpec.callback = audio_callback;
-  desiredSpec.userdata = (void*) top;
-
-  SDL_AudioDeviceID audioDevice = SDL_OpenAudioDevice(NULL, 0, &desiredSpec, &obtainedSpec, 0);
-  if (audioDevice == 0) {
-    SDL_Log("Failed to open audio device: %s", SDL_GetError());
-    SDL_Log("Continuing without audio...");
-  } else {
-    SDL_Log("Audio opened: %d Hz, %d channels, %d samples buffer", 
-            obtainedSpec.freq, obtainedSpec.channels, obtainedSpec.samples);
-    // Start audio playback
-    SDL_PauseAudioDevice(audioDevice, 0);
-  }
-#else
-  SDL_AudioDeviceID audioDevice = 0;  // Dummy for cleanup
-#endif
 
   SDL_Log("Controls: SPACE/UP = Jump, H = Halt/Pause, ESC = Quit");
 
@@ -231,21 +158,6 @@ int main(int argc, char** argv) {
           }
         }
         
-#ifdef WITH_AUDIO
-        // Capture audio samples when new_sample signal is high
-        if (top->rootp->tt_um_goose_game__DOT__audio_ctrl__DOT__new_sample) {
-          // Read the audio sample (convert signed to unsigned for SDL)
-          int16_t signed_sample = top->rootp->tt_um_goose_game__DOT__audio_ctrl__DOT__audio_sample_reg;
-          uint16_t sample = signed_sample ^ 0x8000;  // Convert to unsigned
-          
-          int next_write = (audio_write_pos + 1) % AUDIO_BUFFER_SIZE;
-          if (next_write != audio_read_pos) {  // Don't overwrite if buffer is full
-            audio_buffer[audio_write_pos] = sample;
-            audio_write_pos = next_write;
-          }
-        }
-#endif
-        
         // Sample outputs in visible area
         if (v < V_DISPLAY && h < H_DISPLAY) {
           // Extract 2-bit RGB from uo_out: {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]}
@@ -269,11 +181,6 @@ int main(int argc, char** argv) {
   }
 
   // Cleanup
-#ifdef WITH_AUDIO
-  if (audioDevice != 0) {
-    SDL_CloseAudioDevice(audioDevice);
-  }
-#endif
   SDL_DestroyTexture(texture);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);

@@ -3,10 +3,8 @@
  * 
  * Manages all game state logic:
  * - Game state FSM (running, game over, reset)
- * - Score tracking
  * - Obstacle spawn/despawn
  * - Collision handling
- * - Audio event generation
  * - Obstacle type randomization
  */
 
@@ -36,15 +34,7 @@ module game_controller (
     
     // Obstacle state outputs
     output reg [1:0] obstacle_select,
-    output reg [1:0] obstacle_type,
-    
-    // Score output
-    output wire [15:0] score_out,
-    
-    // Audio event outputs
-    output wire event_jump,
-    output wire event_death,
-    output wire event_highscore
+    output reg [1:0] obstacle_type
 );
 
 // ============================================================================
@@ -59,55 +49,6 @@ reg [19:0] no_jump_ctr;
 assign game_reset = game_over & jump_button & (no_jump_ctr > 20'd100000);
 assign game_halt = game_over || halt_button || (start_ctr < START_TIME);
 assign game_start_blink = (start_ctr >= START_TIME) || start_ctr[22] || game_over;
-
-// ============================================================================
-// Score Tracking - DISABLED FOR SIZE REDUCTION
-// ============================================================================
-
-// Score tracking disabled to reduce utilization
-// Saves ~40 lines of BCD counter logic + 22-bit counter + 4x4-bit BCD storage
-assign score_out = 16'h0000;
-
-/*
-localparam SCORE_INC_TIME = 2517500;  // ~100ms at 25MHz
-
-reg [21:0] score_ctr;
-reg [3:0] score[3:0];  // 4 BCD digits
-
-assign score_out = {score[3], score[2], score[1], score[0]};
-
-always @(posedge clk) begin
-    if (game_reset || !rst_n) begin
-        score_ctr <= 0;
-        score[3] <= 0;
-        score[2] <= 0;
-        score[1] <= 0;
-        score[0] <= 0;
-    end
-    else if (!game_halt) begin
-        score_ctr <= score_ctr + 1;
-        if (score_ctr >= SCORE_INC_TIME) begin
-            score_ctr <= 0;
-            score[0] <= score[0] + 1;
-            if (score[0] + 1 >= 10) begin
-                score[0] <= 0;
-                score[1] <= score[1] + 1;
-                if (score[1] + 1 >= 10) begin
-                    score[1] <= 0;
-                    score[2] <= score[2] + 1;
-                    if (score[2] + 1 >= 10) begin
-                        score[2] <= 0;
-                        score[3] <= score[3] + 1;
-                        if (score[3] + 1 >= 10) begin
-                            score[3] <= 0;
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-*/
 
 // ============================================================================
 // Obstacle State Management
@@ -158,53 +99,6 @@ always @(posedge clk) begin
         end
     end
 end
-
-// ============================================================================
-// Audio Event Generation - DISABLED FOR SIZE REDUCTION
-// ============================================================================
-
-// Audio disabled to reduce utilization
-// Saves ~38 lines of event pulse generation + 4 registers (event_jump_ctr, event_death_ctr, event_jump_prev, collision_prev)
-assign event_jump = 1'b0;
-assign event_death = 1'b0;
-assign event_highscore = 1'b0;
-
-/*
-reg [9:0] event_jump_ctr;
-reg [9:0] event_death_ctr;
-reg event_jump_prev;
-reg collision_prev;
-
-assign event_jump = (event_jump_ctr > 0);
-assign event_death = (event_death_ctr > 0);
-assign event_highscore = 1'b0;  // TODO: Implement high score detection
-
-always @(posedge clk) begin
-    if (!rst_n) begin
-        event_jump_ctr <= 10'd0;
-        event_death_ctr <= 10'd0;
-        event_jump_prev <= 1'b0;
-        collision_prev <= 1'b0;
-    end
-    else begin
-        // Jump event: rising edge of jump_button, only when on ground
-        if (jump_button && !event_jump_prev && !in_air) begin
-            event_jump_ctr <= 10'd512;
-        end else if (event_jump_ctr > 0) begin
-            event_jump_ctr <= event_jump_ctr - 10'd1;
-        end
-        event_jump_prev <= jump_button;
-        
-        // Death event: collision while alive
-        if (collision && !collision_prev && !game_over) begin
-            event_death_ctr <= 10'd512;
-        end else if (event_death_ctr > 0) begin
-            event_death_ctr <= event_death_ctr - 10'd1;
-        end
-        collision_prev <= collision;
-    end
-end
-*/
 
 // ============================================================================
 // Game State FSM
