@@ -67,9 +67,7 @@ reg [1:0] tram_r, tram_g, tram_b;
 reg [1:0] emblem_r, emblem_g, emblem_b;
 
 // Collision: goose hits any obstacle (ION railway or UW emblem only)
-// *** ION tram temporarily disabled for size testing - only checking UW emblem ***
-assign collision = layers[0] & layers[2];  // Only UW emblem collision while ION commented out
-// assign collision = layers[0] & (layers[1] | layers[2]);  // Original with both obstacles
+assign collision = layers[0] & (layers[1] | layers[2]);
 
 // Composite all layers with colors (priority order: goose, obstacles, ION, floor texture, floor, sky)
 wire [1:0] final_r, final_g, final_b;
@@ -315,8 +313,6 @@ always @(posedge clk) begin
             end
 
             // Layer 1: First ION railway obstacle (front-view tram sprite)
-            // *** TEMPORARILY COMMENTED OUT FOR SIZE TESTING ***
-            /*
             if (obstacle_select[0]) begin
                 if (haddr >= obs1_x && haddr < (obs1_x + ION_WIDTH) &&
                     vaddr >= (FLOOR_Y - ION_HEIGHT) && vaddr < FLOOR_Y) begin
@@ -383,7 +379,6 @@ always @(posedge clk) begin
                     end
                 end
             end
-            */
 
             // Layer 2: UW emblem obstacle (shield with coat of arms) - 40×48 pixels
             if (obstacle_select[1]) begin
