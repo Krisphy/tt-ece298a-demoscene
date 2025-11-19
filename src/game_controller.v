@@ -75,7 +75,7 @@ end
 always @(posedge clk) begin
     if (!rst_n) begin
         game_over <= 1'b0;
-        start_ctr <= 32'd0;
+        start_ctr <= 25'd0;
         no_jump_ctr <= 20'd0;
         // game_running <= 1'b0;
     end
