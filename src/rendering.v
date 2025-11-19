@@ -21,7 +21,7 @@ module rendering (
     input wire game_over,
     input wire game_start_blink,
 
-    input wire obstacle_active,  // From game_controller (was obstacle_select)
+    input wire obstacle_active,  // From game_controller
     input wire [6:0] jump_pos,
     input wire [9:0] vaddr,
     input wire [9:0] haddr,
@@ -33,9 +33,8 @@ module rendering (
 );
 
 // Simple sprite definitions using rectangles
-// Goose sprite: 30x40 pixels (goose-shaped sprite)
-localparam GOOSE_WIDTH = 30;
-localparam GOOSE_HEIGHT = 40;
+localparam GOOSE_WIDTH = 16;
+localparam GOOSE_HEIGHT = 16;
 localparam GOOSE_X = 50;
 localparam GOOSE_Y_BASE = 200;  // Ground level position
 
@@ -46,18 +45,12 @@ localparam UW_HEIGHT = 48;
 // Floor position
 localparam FLOOR_Y = 240;
 
-// Ground texture - reduced from original (saves ROM)
-// 4 rows × 128 bits = 512 bits
-// Pattern repeats twice horizontally across screen
-reg [127:0] floor_pattern[3:0];
-
-// Layer outputs (priority order: goose, obstacle, floor_texture, floor, sky)
+// Layer outputs (priority order: goose, obstacle, floor, sky)
 localparam integer LAYER_GOOSE = 0;
 localparam integer LAYER_OBSTACLE = 1;
-localparam integer LAYER_FLOOR_TEXTURE = 2;
-localparam integer LAYER_FLOOR = 3;
-localparam integer LAYER_SKY = 4;
-reg [4:0] layers;
+localparam integer LAYER_FLOOR = 2;
+localparam integer LAYER_SKY = 3;
+reg [3:0] layers;
 
 // Goose per-pixel colors (for shading)
 reg [1:0] goose_r, goose_g, goose_b;
@@ -67,23 +60,20 @@ reg [1:0] emblem_r, emblem_g, emblem_b;
 // Collision: goose hits UW emblem
 assign collision = layers[LAYER_GOOSE] & layers[LAYER_OBSTACLE];
 
-// Composite all layers with colors (priority order: goose, obstacles, floor texture, floor, sky)
+// Composite all layers with colors (priority order: goose, obstacles, floor, sky)
 wire [1:0] final_r, final_g, final_b;
 assign final_r = (layers[LAYER_GOOSE] ? goose_r :        // Goose (with shading)
                   layers[LAYER_OBSTACLE] ? emblem_r :    // UW emblem (with colors)
-                  layers[LAYER_FLOOR_TEXTURE] ? 2'b11 :  // Floor texture: white R=11
                   layers[LAYER_FLOOR] ? 2'b01 :          // Floor: R=01
                   layers[LAYER_SKY] ? 2'b00 : 2'b00);    // Sky: R=00
 
 assign final_g = (layers[LAYER_GOOSE] ? goose_g :        // Goose (with shading)
                   layers[LAYER_OBSTACLE] ? emblem_g :    // UW emblem (with colors)
-                  layers[LAYER_FLOOR_TEXTURE] ? 2'b11 :  // Floor texture: white G=11
                   layers[LAYER_FLOOR] ? 2'b01 :          // Floor: G=01
                   layers[LAYER_SKY] ? 2'b11 : 2'b00);    // Sky: G=11
 
 assign final_b = (layers[LAYER_GOOSE] ? goose_b :        // Goose (with shading)
                   layers[LAYER_OBSTACLE] ? emblem_b :    // UW emblem (with colors)
-                  layers[LAYER_FLOOR_TEXTURE] ? 2'b11 :  // Floor texture: white B=11
                   layers[LAYER_FLOOR] ? 2'b01 :          // Floor: B=01
                   layers[LAYER_SKY] ? 2'b11 : 2'b00);    // Sky: B=11
 
@@ -92,16 +82,15 @@ assign G = display_on ? final_g : 2'b00;
 assign B = display_on ? final_b : 2'b00;
 
 wire [10:0] goose_y = GOOSE_Y_BASE - {4'd0, jump_pos};
-wire [6:0] flooraddr = 7'(haddr + scrolladdr); // Floor texture address (lower 7 bits)
 wire [10:0] obs2_x = 11'd640 - scrolladdr + 11'd250;
 
 // Goose sprite coordinates (for color calculation)
-wire [5:0] goose_diff_y = 6'({1'b0, vaddr} - goose_y); 
-wire [4:0] goose_diff_x = 5'({1'b0, haddr} - 11'(GOOSE_X));
-wire [5:0] goose_sprite_y = ({1'b0, vaddr} >= goose_y && {1'b0, vaddr} < (goose_y + GOOSE_HEIGHT)) ?
-                            goose_diff_y : 6'd0;
-wire [4:0] goose_sprite_x = ({1'b0, haddr} >= GOOSE_X && {1'b0, haddr} < (GOOSE_X + GOOSE_WIDTH)) ?
-                            goose_diff_x : 5'd0;
+wire [3:0] goose_diff_y = 4'({1'b0, vaddr} - goose_y); 
+wire [3:0] goose_diff_x = 4'({1'b0, haddr} - 11'(GOOSE_X));
+wire [3:0] goose_sprite_y = ({1'b0, vaddr} >= goose_y && {1'b0, vaddr} < (goose_y + GOOSE_HEIGHT)) ?
+                            goose_diff_y : 4'd0;
+wire [3:0] goose_sprite_x = ({1'b0, haddr} >= GOOSE_X && {1'b0, haddr} < (GOOSE_X + GOOSE_WIDTH)) ?
+                            goose_diff_x : 4'd0;
 
 // Emblem sprite coordinates (for obstacle 2)
 wire [5:0] emblem_diff_y = 6'({1'b0, vaddr} - 11'(FLOOR_Y - UW_HEIGHT));
@@ -113,7 +102,7 @@ wire [5:0] emblem_sprite_x = ({1'b0, haddr} >= obs2_x && {1'b0, haddr} < (obs2_x
 
 always @(posedge clk) begin
     if (sys_rst) begin
-        layers <= 5'd0;
+        layers <= 4'd0;
         goose_r <= 2'b00;
         goose_g <= 2'b00;
         goose_b <= 2'b00;
@@ -122,7 +111,7 @@ always @(posedge clk) begin
         emblem_b <= 2'b00;
     end
     else begin
-        layers <= 5'd0;
+        layers <= 4'd0;
         
         // Default goose colors (will be overridden if goose is drawn)
         goose_r <= 2'b11;
@@ -140,21 +129,14 @@ always @(posedge clk) begin
                 layers[LAYER_FLOOR] <= 1'b1;
             end
             
-            // Layer 3: Floor texture (reduced pattern on first 4 rows of ground)
-            if (vaddr >= FLOOR_Y && vaddr < (FLOOR_Y + 4)) begin
-                // Index into 128-bit repeating pattern using lower 7 bits of scroll position
-                // Pattern repeats twice across the 256-pixel horizontal space
-                layers[LAYER_FLOOR_TEXTURE] <= floor_pattern[vaddr - FLOOR_Y][flooraddr];
-            end
-            
             // Layer 0: Goose sprite
             if ({1'b0, haddr} >= GOOSE_X && {1'b0, haddr} < (GOOSE_X + GOOSE_WIDTH) &&
                 {1'b0, vaddr} >= goose_y && {1'b0, vaddr} < (goose_y + GOOSE_HEIGHT) &&
                 game_start_blink) begin
                 
-                // Body (Brown)
-                if (goose_sprite_y >= 20 && goose_sprite_y <= 35 &&
-                    goose_sprite_x >= 5 && goose_sprite_x <= 25) begin
+                // Body (Brown) - x:2-12, y:10-14
+                if (goose_sprite_y >= 10 && goose_sprite_y <= 14 &&
+                    goose_sprite_x >= 2 && goose_sprite_x <= 12) begin
                     layers[LAYER_GOOSE] <= 1'b1;
                     if (game_over) begin
                         goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
@@ -162,9 +144,9 @@ always @(posedge clk) begin
                         goose_r <= 2'b10; goose_g <= 2'b10; goose_b <= 2'b01;
                     end
                 end
-                // Neck (Black)
-                else if (goose_sprite_y >= 10 && goose_sprite_y < 20 &&
-                         goose_sprite_x >= 18 && goose_sprite_x <= 22) begin
+                // Neck (Black) - x:10-12, y:6-10
+                else if (goose_sprite_y >= 6 && goose_sprite_y < 10 &&
+                         goose_sprite_x >= 10 && goose_sprite_x <= 12) begin
                     layers[LAYER_GOOSE] <= 1'b1;
                     if (game_over) begin
                          goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
@@ -172,9 +154,9 @@ always @(posedge clk) begin
                          goose_r <= 2'b00; goose_g <= 2'b00; goose_b <= 2'b00;
                     end
                 end
-                // Head (Black)
-                else if (goose_sprite_y >= 5 && goose_sprite_y < 10 &&
-                         goose_sprite_x >= 18 && goose_sprite_x <= 26) begin
+                // Head (Black) - x:10-14, y:2-6
+                else if (goose_sprite_y >= 2 && goose_sprite_y < 6 &&
+                         goose_sprite_x >= 10 && goose_sprite_x <= 14) begin
                     layers[LAYER_GOOSE] <= 1'b1;
                     if (game_over) begin
                          goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
@@ -182,9 +164,9 @@ always @(posedge clk) begin
                          goose_r <= 2'b00; goose_g <= 2'b00; goose_b <= 2'b00;
                     end
                 end
-                // Beak (Orange)
-                else if (goose_sprite_y >= 7 && goose_sprite_y <= 9 &&
-                         goose_sprite_x >= 26 && goose_sprite_x <= 29) begin
+                // Beak (Orange) - x:14-15, y:3-5
+                else if (goose_sprite_y >= 3 && goose_sprite_y <= 5 &&
+                         goose_sprite_x >= 14) begin
                     layers[LAYER_GOOSE] <= 1'b1;
                     if (game_over) begin
                          goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
@@ -192,10 +174,10 @@ always @(posedge clk) begin
                          goose_r <= 2'b11; goose_g <= 2'b10; goose_b <= 2'b01;
                     end
                 end
-                // Legs (Black)
-                else if (goose_sprite_y > 35 && goose_sprite_y <= 39 &&
-                         ((goose_sprite_x >= 10 && goose_sprite_x <= 12) ||
-                          (goose_sprite_x >= 18 && goose_sprite_x <= 20))) begin
+                // Legs (Black) - x:4-5 & x:9-10, y=15
+                else if (goose_sprite_y == 15 &&
+                         ((goose_sprite_x >= 4 && goose_sprite_x <= 5) ||
+                          (goose_sprite_x >= 9 && goose_sprite_x <= 10))) begin
                     layers[LAYER_GOOSE] <= 1'b1;
                     if (game_over) begin
                          goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
@@ -372,16 +354,6 @@ always @(posedge clk) begin
             end
         end
     end
-end
-
-// Ground texture initialization - reduced from original dinogame pattern
-initial begin
-    // First 128 bits from each of the first 4 rows of original 256-bit pattern
-    // Pattern repeats twice horizontally
-    floor_pattern[0] = 128'b00000000000000000000000000000000000000000000000000000000000000000000000000000000111000000000000000000000000000000000000000000000;
-    floor_pattern[1] = 128'b11111111111111111111111111111111111111111111111111111111111111111111111111111111001111100011111111111111111111111111111111111111;
-    floor_pattern[2] = 128'b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000111110000000000000000000000000000000000000;
-    floor_pattern[3] = 128'b00000000100000000000001000000000000000110110000001000000000001000000000000000000000001000000100000000001000000000000000000000010;
 end
 
 endmodule
