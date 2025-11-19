@@ -34,12 +34,8 @@ GOOSE_SOURCES = $(SRC_DIR)/goose_game_top.v \
                 $(SRC_DIR)/jumping.v \
                 $(SRC_DIR)/scroll.v
 
-# VGA demo sources (simple color pattern demo)
-VGADEMO_SOURCES = $(SRC_DIR)/vga_example.v \
-                  $(SRC_DIR)/hvsync_generator.v
-
 # Build targets
-all: goosegame vgademo
+all: goosegame
 
 # Goose game
 goosegame: $(GOOSE_SOURCES) goosegame_tb.cpp
@@ -48,15 +44,9 @@ goosegame: $(GOOSE_SOURCES) goosegame_tb.cpp
 	$(MAKE) -C obj_dir -f Vtt_um_goose_game.mk
 	cp obj_dir/Vtt_um_goose_game goosegame
 
-vgademo: $(VGADEMO_SOURCES) vgademo_tb.cpp
-	$(VERILATOR) $(VERILATOR_FLAGS) $^ \
-		-CFLAGS "-std=c++14 -g -O3 $(SDL2_CFLAGS)" --LDFLAGS "$(SDL2_LDFLAGS)" --top-module tt_um_vga_example
-	$(MAKE) -C obj_dir -f Vtt_um_vga_example.mk
-	cp obj_dir/Vtt_um_vga_example vgademo
-
 clean:
 	rm -rf obj_dir
-	rm -f goosegame vgademo
+	rm -f goosegame
 	rm -f *.vcd
 
 # Run targets
@@ -64,8 +54,4 @@ run: goosegame
 	@echo "Running goose game..."
 	./goosegame
 
-run-demo: vgademo
-	@echo "Running VGA demo..."
-	./vgademo
-
-.PHONY: all clean run run-demo
+.PHONY: all clean run

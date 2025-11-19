@@ -127,8 +127,6 @@ module tt_um_goose_game(
   scroll scroll_inst (
     .pos(scrolladdr),
     .halt(game_halt),
-    .speed_change(8'd4),  // Acceleration
-    .move_amt(8'd2),      // Scroll speed
     .game_rst(game_reset),
     .clk(clk),
     .sys_rst(~rst_n)

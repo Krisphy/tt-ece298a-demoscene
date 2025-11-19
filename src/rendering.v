@@ -33,17 +33,24 @@ module rendering (
 );
 
 // Simple sprite definitions using rectangles
-localparam GOOSE_WIDTH = 16;
-localparam GOOSE_HEIGHT = 16;
-localparam GOOSE_X = 50;
-localparam GOOSE_Y_BASE = 200;  // Ground level position
+// Floor position
+localparam [10:0] FLOOR_Y = 11'd240;
+
+localparam integer GOOSE_WIDTH = 16;
+localparam integer GOOSE_HEIGHT = 16;
+localparam [10:0] GOOSE_WIDTH_PX = 11'd16;
+localparam [10:0] GOOSE_HEIGHT_PX = 11'd16;
+localparam [10:0] GOOSE_X = 11'd50;
+localparam [10:0] GOOSE_Y_BASE = FLOOR_Y - GOOSE_HEIGHT_PX;  // Ground level position (bottom of goose aligns with floor)
 
 // UW emblem obstacle: 40x48 pixels (shield with coat of arms)
-localparam UW_WIDTH = 40;
-localparam UW_HEIGHT = 48;
-
-// Floor position
-localparam FLOOR_Y = 240;
+localparam integer UW_WIDTH = 40;
+localparam integer UW_HEIGHT = 48;
+localparam [10:0] UW_WIDTH_PX = 11'd40;
+localparam [10:0] UW_HEIGHT_PX = 11'd48;
+localparam [10:0] OBSTACLE_TOP = FLOOR_Y - UW_HEIGHT_PX;
+localparam [10:0] SCREEN_WIDTH = 11'd640;
+localparam [10:0] OBSTACLE_OFFSET = 11'd250;
 
 // Layer outputs (priority order: goose, obstacle, floor, sky)
 localparam integer LAYER_GOOSE = 0;
@@ -56,6 +63,131 @@ reg [3:0] layers;
 reg [1:0] goose_r, goose_g, goose_b;
 // Emblem per-pixel colors
 reg [1:0] emblem_r, emblem_g, emblem_b;
+
+localparam integer COLOR_BITS = 3;
+localparam [COLOR_BITS-1:0] COLOR_TRANSPARENT = 3'd0;
+localparam [COLOR_BITS-1:0] COLOR_GOOSE_BODY = 3'd1;
+localparam [COLOR_BITS-1:0] COLOR_BLACK = 3'd2;
+localparam [COLOR_BITS-1:0] COLOR_BEAK = 3'd3;
+localparam [COLOR_BITS-1:0] COLOR_GOLD = 3'd4;
+localparam [COLOR_BITS-1:0] COLOR_WHITE = 3'd5;
+localparam [COLOR_BITS-1:0] COLOR_RED = 3'd6;
+
+reg [COLOR_BITS*GOOSE_WIDTH-1:0] goose_rom [0:GOOSE_HEIGHT-1];
+reg [COLOR_BITS*UW_WIDTH-1:0] uw_rom [0:UW_HEIGHT-1];
+
+function [5:0] palette;
+    input [COLOR_BITS-1:0] idx;
+    begin
+        case (idx)
+            COLOR_GOOSE_BODY: palette = {2'b10, 2'b10, 2'b01};  // Brown
+            COLOR_BLACK:      palette = {2'b00, 2'b00, 2'b00};
+            COLOR_BEAK:       palette = {2'b11, 2'b10, 2'b01};  // Orange
+            COLOR_GOLD:       palette = {2'b11, 2'b10, 2'b00};
+            COLOR_WHITE:      palette = {2'b11, 2'b11, 2'b11};
+            COLOR_RED:        palette = {2'b10, 2'b00, 2'b00};
+            default:          palette = 6'b000000;
+        endcase
+    end
+endfunction
+
+function [COLOR_BITS-1:0] goose_pixel_from_row;
+    input [COLOR_BITS*GOOSE_WIDTH-1:0] row_bits;
+    input [3:0] px;
+    integer shift;
+    integer msb;
+    integer px_int;
+    begin
+        px_int = {{(32-4){1'b0}}, px};
+        shift = px_int * COLOR_BITS;
+        msb = (GOOSE_WIDTH*COLOR_BITS - 1) - shift;
+        goose_pixel_from_row = row_bits[msb -: COLOR_BITS];
+    end
+endfunction
+
+function [COLOR_BITS-1:0] uw_pixel_from_row;
+    input [COLOR_BITS*UW_WIDTH-1:0] row_bits;
+    input [5:0] px;
+    integer shift;
+    integer msb;
+    integer px_int;
+    begin
+        px_int = {{(32-6){1'b0}}, px};
+        shift = px_int * COLOR_BITS;
+        msb = (UW_WIDTH*COLOR_BITS - 1) - shift;
+        uw_pixel_from_row = row_bits[msb -: COLOR_BITS];
+    end
+endfunction
+
+initial begin
+    // Goose sprite ROM (16x16, 3 bits per pixel)
+    goose_rom[0]  = 48'b000000000000000000000000000000000000000000000000;
+    goose_rom[1]  = 48'b000000000000000000000000000000000000000000000000;
+    goose_rom[2]  = 48'b000000000000000000000000000000010010010010010000;
+    goose_rom[3]  = 48'b000000000000000000000000000000010010010010010011;
+    goose_rom[4]  = 48'b000000000000000000000000000000010010010010010011;
+    goose_rom[5]  = 48'b000000000000000000000000000000010010010010010011;
+    goose_rom[6]  = 48'b000000000000000000000000000000010010010000000000;
+    goose_rom[7]  = 48'b000000000000000000000000000000010010010000000000;
+    goose_rom[8]  = 48'b000000000000000000000000000000010010010000000000;
+    goose_rom[9]  = 48'b000000000000000000000000000000010010010000000000;
+    goose_rom[10] = 48'b000000001001001001001001001001001001001000000000;
+    goose_rom[11] = 48'b000000001001001001001001001001001001001000000000;
+    goose_rom[12] = 48'b000000001001001001001001001001001001001000000000;
+    goose_rom[13] = 48'b000000001001001001001001001001001001001000000000;
+    goose_rom[14] = 48'b000000001001001001001001001001001001001000000000;
+    goose_rom[15] = 48'b000000000000010010000000000010010000000000000000;
+
+    // UW emblem ROM (40x48, 3 bits per pixel)
+    uw_rom[0]  = 120'b010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010;
+    uw_rom[1]  = 120'b010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010;
+    uw_rom[2]  = 120'b010101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101010;
+    uw_rom[3]  = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
+    uw_rom[4]  = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
+    uw_rom[5]  = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
+    uw_rom[6]  = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
+    uw_rom[7]  = 120'b010101100100100100100100100100100100110110110100100100100100100100100100100100110110110100100100100100100100100100101010;
+    uw_rom[8]  = 120'b010101100100100100100100110110110110110110110100100100100100100100100100100100110110110110110110110100100100100100101010;
+    uw_rom[9]  = 120'b010101100100100100100100110110110110110110110110100100100100100100100100100110110110110110110110110100100100100100101010;
+    uw_rom[10] = 120'b010101100100100100100100110110110110110110110110100100100100100100100100100110110110110110110110110100100100100100101010;
+    uw_rom[11] = 120'b010101100100100100100100110110110110110110100100100100100100100100100100100100100110110110110110110100100100100100101010;
+    uw_rom[12] = 120'b010101100100100100100100110110110110110110100100100010010010010010010010100100100110110110110110110100100100100100101010;
+    uw_rom[13] = 120'b010101100100100100100100110110110110110110100100010010010010100010010010010100100110110110110110110100100100100100101010;
+    uw_rom[14] = 120'b010101100100100100100100100100100100100100100010010101101101100101101101010010100100100100100100100100100100100100101010;
+    uw_rom[15] = 120'b010101100100100100100100100100100100100100010010101101101100100100101101101010010100100100100100100100100100100100101010;
+    uw_rom[16] = 120'b010101100100100100100100100100100100100010010101101101100100100100100101101101010010100100100100100100100100100100101010;
+    uw_rom[17] = 120'b010101100100100100100100100100100100010010101101101100100100100100100100101101101010010100100100100100100100100100101010;
+    uw_rom[18] = 120'b010101100100100100100100100100100010010101101101100100100100100100100100100101101101010010100100100100100100100100101010;
+    uw_rom[19] = 120'b010101100100100100100100100100010010101101101100100100100100100100100100100100101101101010010100100100100100100100101010;
+    uw_rom[20] = 120'b010101100100100100100100100010010101101101100100100100100100100100100100100100100101101101010010100100100100100100101010;
+    uw_rom[21] = 120'b010101100100100100100100010010101101101100100100100100100100100100100100100100100100101101101010010100100100100100101010;
+    uw_rom[22] = 120'b010101100100100100100010010101101101100100100100100100100100100100100100100100100100100101101101010010100100100100101010;
+    uw_rom[23] = 120'b010101100100100100010010101101101100100100100100100100100100100100100100100100100100100100101101101010010100100100101010;
+    uw_rom[24] = 120'b010101100100100010010010010100100100100100100100100100100100100100100100100100100100100100100100010010010010100100101010;
+    uw_rom[25] = 120'b010101100100010010010010100100100100100100100100100100100100100100100100100100100100100100100100100010010010010100101010;
+    uw_rom[26] = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
+    uw_rom[27] = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
+    uw_rom[28] = 120'b010101100100100100100100100100100100100100100100100100110110110110110100100100100100100100100100100100100100100100101010;
+    uw_rom[29] = 120'b010101100100100100100100100100100100100100100100100100110110110110110100100100100100100100100100100100100100100100101010;
+    uw_rom[30] = 120'b010101100100100100100100100100100100100100100100110110110110110110110110110100100100100100100100100100100100100100101010;
+    uw_rom[31] = 120'b000010101100100100100100100100100100100100100100110110110110110110110110110100100100100100100100100100100100100101010000;
+    uw_rom[32] = 120'b000000010101100100100100100100100100100100100110110110110110110110110110110110100100100100100100100100100100101010000000;
+    uw_rom[33] = 120'b000000000010101100100100100100100100100100100110110110110110110110110110110110100100100100100100100100100101010000000000;
+    uw_rom[34] = 120'b000000000000010101100100100100100100100100100100110110110110110110110110110100100100100100100100100100101010000000000000;
+    uw_rom[35] = 120'b000000000000000010101100100100100100100100100100110110110110110110110110110100100100100100100100100101010000000000000000;
+    uw_rom[36] = 120'b000000000000000000010101100100100100100100100100110110110110110110110110110100100100100100100100101010000000000000000000;
+    uw_rom[37] = 120'b000000000000000000000010101100100100100100100100110110110110110110110110110100100100100100100101010000000000000000000000;
+    uw_rom[38] = 120'b000000000000000000000000010101100100100100100100100100100100100100100100100100100100100100101010000000000000000000000000;
+    uw_rom[39] = 120'b000000000000000000000000000010101100100100100100100100100100100100100100100100100100100101010000000000000000000000000000;
+    uw_rom[40] = 120'b000000000000000000000000000000010101100100100100100100100100100100100100100100100100101010000000000000000000000000000000;
+    uw_rom[41] = 120'b000000000000000000000000000000000010101100100100100100100100100100100100100100100101010000000000000000000000000000000000;
+    uw_rom[42] = 120'b000000000000000000000000000000000000010101100100100100100100100100100100100100101010000000000000000000000000000000000000;
+    uw_rom[43] = 120'b000000000000000000000000000000000000000010101100100100100100100100100100100101010000000000000000000000000000000000000000;
+    uw_rom[44] = 120'b000000000000000000000000000000000000000000010101100100100100100100100100101010000000000000000000000000000000000000000000;
+    uw_rom[45] = 120'b000000000000000000000000000000000000000000000010101100100100100100100101010000000000000000000000000000000000000000000000;
+    uw_rom[46] = 120'b000000000000000000000000000000000000000000000000000000000010010000000000000000000000000000000000000000000000000000000000;
+    uw_rom[47] = 120'b000000000000000000000000000000000000000000000000000000000010010000000000000000000000000000000000000000000000000000000000;
+end
 
 // Collision: goose hits UW emblem
 assign collision = layers[LAYER_GOOSE] & layers[LAYER_OBSTACLE];
@@ -81,24 +213,38 @@ assign R = display_on ? final_r : 2'b00;
 assign G = display_on ? final_g : 2'b00;
 assign B = display_on ? final_b : 2'b00;
 
+wire [10:0] vaddr_ext = {1'b0, vaddr};
+wire [10:0] haddr_ext = {1'b0, haddr};
+
 wire [10:0] goose_y = GOOSE_Y_BASE - {4'd0, jump_pos};
-wire [10:0] obs2_x = 11'd640 - scrolladdr + 11'd250;
+wire [10:0] goose_right = GOOSE_X + GOOSE_WIDTH_PX;
+wire goose_in_bounds = (haddr_ext >= GOOSE_X) && (haddr_ext < goose_right) &&
+                       (vaddr_ext >= goose_y) && (vaddr_ext < (goose_y + GOOSE_HEIGHT_PX));
+wire goose_active = goose_in_bounds && game_start_blink && display_on;
+wire [10:0] goose_x_offset = haddr_ext - GOOSE_X;
+wire [10:0] goose_y_offset = vaddr_ext - goose_y;
+wire [3:0] goose_local_x = goose_in_bounds ? goose_x_offset[3:0] : 4'd0;
+wire [3:0] goose_local_y = goose_in_bounds ? goose_y_offset[3:0] : 4'd0;
+wire [COLOR_BITS*GOOSE_WIDTH-1:0] goose_row_bits = goose_rom[goose_local_y];
+wire [COLOR_BITS-1:0] goose_pixel_raw = goose_pixel_from_row(goose_row_bits, goose_local_x);
+wire [COLOR_BITS-1:0] goose_pixel_idx = goose_active ? goose_pixel_raw : COLOR_TRANSPARENT;
+wire [COLOR_BITS-1:0] goose_color_idx =
+    (game_over && goose_pixel_idx != COLOR_TRANSPARENT) ? COLOR_RED : goose_pixel_idx;
+wire [5:0] goose_rgb = palette(goose_color_idx);
 
-// Goose sprite coordinates (for color calculation)
-wire [3:0] goose_diff_y = 4'({1'b0, vaddr} - goose_y); 
-wire [3:0] goose_diff_x = 4'({1'b0, haddr} - 11'(GOOSE_X));
-wire [3:0] goose_sprite_y = ({1'b0, vaddr} >= goose_y && {1'b0, vaddr} < (goose_y + GOOSE_HEIGHT)) ?
-                            goose_diff_y : 4'd0;
-wire [3:0] goose_sprite_x = ({1'b0, haddr} >= GOOSE_X && {1'b0, haddr} < (GOOSE_X + GOOSE_WIDTH)) ?
-                            goose_diff_x : 4'd0;
-
-// Emblem sprite coordinates (for obstacle 2)
-wire [5:0] emblem_diff_y = 6'({1'b0, vaddr} - 11'(FLOOR_Y - UW_HEIGHT));
-wire [5:0] emblem_diff_x = 6'({1'b0, haddr} - obs2_x);
-wire [5:0] emblem_sprite_y = ({1'b0, vaddr} >= (FLOOR_Y - UW_HEIGHT) && vaddr < FLOOR_Y) ?
-                             emblem_diff_y : 6'd0;
-wire [5:0] emblem_sprite_x = ({1'b0, haddr} >= obs2_x && {1'b0, haddr} < (obs2_x + UW_WIDTH)) ?
-                             emblem_diff_x : 6'd0;
+wire [10:0] obs2_x = SCREEN_WIDTH - scrolladdr + OBSTACLE_OFFSET;
+wire [10:0] obstacle_right = obs2_x + UW_WIDTH_PX;
+wire obstacle_in_bounds = obstacle_active && display_on &&
+                          (haddr_ext >= obs2_x) && (haddr_ext < obstacle_right) &&
+                          (vaddr_ext >= OBSTACLE_TOP) && (vaddr_ext < FLOOR_Y);
+wire [10:0] emblem_x_offset = haddr_ext - obs2_x;
+wire [10:0] emblem_y_offset = vaddr_ext - OBSTACLE_TOP;
+wire [5:0] emblem_local_x = obstacle_in_bounds ? emblem_x_offset[5:0] : 6'd0;
+wire [5:0] emblem_local_y = obstacle_in_bounds ? emblem_y_offset[5:0] : 6'd0;
+wire [COLOR_BITS*UW_WIDTH-1:0] emblem_row_bits = uw_rom[emblem_local_y];
+wire [COLOR_BITS-1:0] emblem_pixel_raw = uw_pixel_from_row(emblem_row_bits, emblem_local_x);
+wire [COLOR_BITS-1:0] emblem_pixel_idx = obstacle_in_bounds ? emblem_pixel_raw : COLOR_TRANSPARENT;
+wire [5:0] emblem_rgb = palette(emblem_pixel_idx);
 
 always @(posedge clk) begin
     if (sys_rst) begin
@@ -112,248 +258,35 @@ always @(posedge clk) begin
     end
     else begin
         layers <= 4'd0;
-        
-        // Default goose colors (will be overridden if goose is drawn)
-        goose_r <= 2'b11;
-        goose_g <= 2'b11;
+        goose_r <= 2'b00;
+        goose_g <= 2'b00;
         goose_b <= 2'b00;
+        emblem_r <= 2'b00;
+        emblem_g <= 2'b00;
+        emblem_b <= 2'b00;
         
         if (display_on) begin
-            // Layer 5: Sky background (everything above ground)
-            if (vaddr < FLOOR_Y) begin
+            if (vaddr_ext < FLOOR_Y) begin
                 layers[LAYER_SKY] <= 1'b1;
             end
-            
-            // Layer 4: Ground area (everything at or below FLOOR_Y) - solid dark grey
-            if (vaddr >= FLOOR_Y) begin
+            else begin
                 layers[LAYER_FLOOR] <= 1'b1;
             end
             
-            // Layer 0: Goose sprite
-            if ({1'b0, haddr} >= GOOSE_X && {1'b0, haddr} < (GOOSE_X + GOOSE_WIDTH) &&
-                {1'b0, vaddr} >= goose_y && {1'b0, vaddr} < (goose_y + GOOSE_HEIGHT) &&
-                game_start_blink) begin
-                
-                // Body (Brown) - x:2-12, y:10-14
-                if (goose_sprite_y >= 10 && goose_sprite_y <= 14 &&
-                    goose_sprite_x >= 2 && goose_sprite_x <= 12) begin
+            if (goose_pixel_idx != COLOR_TRANSPARENT) begin
                     layers[LAYER_GOOSE] <= 1'b1;
-                    if (game_over) begin
-                        goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
-                    end else begin
-                        goose_r <= 2'b10; goose_g <= 2'b10; goose_b <= 2'b01;
-                    end
-                end
-                // Neck (Black) - x:10-12, y:6-10
-                else if (goose_sprite_y >= 6 && goose_sprite_y < 10 &&
-                         goose_sprite_x >= 10 && goose_sprite_x <= 12) begin
-                    layers[LAYER_GOOSE] <= 1'b1;
-                    if (game_over) begin
-                         goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
-                    end else begin
-                         goose_r <= 2'b00; goose_g <= 2'b00; goose_b <= 2'b00;
-                    end
-                end
-                // Head (Black) - x:10-14, y:2-6
-                else if (goose_sprite_y >= 2 && goose_sprite_y < 6 &&
-                         goose_sprite_x >= 10 && goose_sprite_x <= 14) begin
-                    layers[LAYER_GOOSE] <= 1'b1;
-                    if (game_over) begin
-                         goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
-                    end else begin
-                         goose_r <= 2'b00; goose_g <= 2'b00; goose_b <= 2'b00;
-                    end
-                end
-                // Beak (Orange) - x:14-15, y:3-5
-                else if (goose_sprite_y >= 3 && goose_sprite_y <= 5 &&
-                         goose_sprite_x >= 14) begin
-                    layers[LAYER_GOOSE] <= 1'b1;
-                    if (game_over) begin
-                         goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
-                    end else begin
-                         goose_r <= 2'b11; goose_g <= 2'b10; goose_b <= 2'b01;
-                    end
-                end
-                // Legs (Black) - x:4-5 & x:9-10, y=15
-                else if (goose_sprite_y == 15 &&
-                         ((goose_sprite_x >= 4 && goose_sprite_x <= 5) ||
-                          (goose_sprite_x >= 9 && goose_sprite_x <= 10))) begin
-                    layers[LAYER_GOOSE] <= 1'b1;
-                    if (game_over) begin
-                         goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
-                    end else begin
-                         goose_r <= 2'b00; goose_g <= 2'b00; goose_b <= 2'b00;
-                    end
-                end
+                {goose_r, goose_g, goose_b} <= goose_rgb;
             end
 
-            // Layer 2: UW emblem obstacle (shield with coat of arms) - 40×48 pixels
-            if (obstacle_active) begin
-                if ({1'b0, haddr} >= obs2_x && {1'b0, haddr} < (obs2_x + UW_WIDTH) &&
-                    vaddr >= (FLOOR_Y - UW_HEIGHT) && vaddr < FLOOR_Y) begin
-                    
-                    // Parametric UW emblem rendering (40×48 shield)
-                    // Priority: specific details over general areas
-                    
-                    // === LIONS (three simplified red rampant lions) ===
-                    // Upper-left lion: centered ~(11, 10), 10×10 box
-                    if (((emblem_sprite_y >= 7 && emblem_sprite_y <= 13) && 
-                         (emblem_sprite_x >= 7 && emblem_sprite_x <= 15)) &&
-                        (// Body: 6×6 core
-                         ((emblem_sprite_y >= 8 && emblem_sprite_y <= 13) && (emblem_sprite_x >= 8 && emblem_sprite_x <= 13)) ||
-                         // Head: 3×3 top-right
-                         ((emblem_sprite_y >= 7 && emblem_sprite_y <= 9) && (emblem_sprite_x >= 12 && emblem_sprite_x <= 14)) ||
-                         // Raised paw: 2×2
-                         ((emblem_sprite_y >= 9 && emblem_sprite_y <= 10) && (emblem_sprite_x >= 14 && emblem_sprite_x <= 15)))) begin
+            if (emblem_pixel_idx != COLOR_TRANSPARENT) begin
                         layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00; // Red #AA0000
-                    end
-                    // Upper-right lion: centered ~(29, 10), mirrored
-                    else if (((emblem_sprite_y >= 7 && emblem_sprite_y <= 13) && 
-                              (emblem_sprite_x >= 25 && emblem_sprite_x <= 33)) &&
-                             (// Body: 6×6 core
-                              ((emblem_sprite_y >= 8 && emblem_sprite_y <= 13) && (emblem_sprite_x >= 27 && emblem_sprite_x <= 32)) ||
-                              // Head: 3×3 top-left
-                              ((emblem_sprite_y >= 7 && emblem_sprite_y <= 9) && (emblem_sprite_x >= 26 && emblem_sprite_x <= 28)) ||
-                              // Raised paw: 2×2
-                              ((emblem_sprite_y >= 9 && emblem_sprite_y <= 10) && (emblem_sprite_x >= 25 && emblem_sprite_x <= 26)))) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00; // Red #AA0000
-                    end
-                    // Lower-center lion: centered ~(20, 32), slightly larger 12×10
-                    else if (((emblem_sprite_y >= 28 && emblem_sprite_y <= 37) && 
-                              (emblem_sprite_x >= 15 && emblem_sprite_x <= 25)) &&
-                             (// Body: 8×8 core
-                              ((emblem_sprite_y >= 30 && emblem_sprite_y <= 37) && (emblem_sprite_x >= 16 && emblem_sprite_x <= 24)) ||
-                              // Head: 4×4 top
-                              ((emblem_sprite_y >= 28 && emblem_sprite_y <= 31) && (emblem_sprite_x >= 18 && emblem_sprite_x <= 22)) ||
-                              // Paws: 2×2 each side
-                              ((emblem_sprite_y >= 32 && emblem_sprite_y <= 33) && 
-                               ((emblem_sprite_x >= 15 && emblem_sprite_x <= 16) || (emblem_sprite_x >= 24 && emblem_sprite_x <= 25))))) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00; // Red #AA0000
-                    end
-                    
-                    // === WHITE CHEVRON INTERIOR (inside black chevron) ===
-                    // Chevron apex at (20, 24), arms extend to ~(6, 12) and (34, 12)
-                    // White fill: 2-3px inside the black outline
-                    else if (((emblem_sprite_y >= 14 && emblem_sprite_y <= 23)) &&
-                             (// Left arm white fill
-                              ((emblem_sprite_x >= (8 + (23 - emblem_sprite_y))) && 
-                               (emblem_sprite_x <= (10 + (23 - emblem_sprite_y)))) ||
-                              // Right arm white fill
-                              ((emblem_sprite_x >= (30 - (23 - emblem_sprite_y))) && 
-                               (emblem_sprite_x <= (32 - (23 - emblem_sprite_y)))))) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11; // White #FFFFFF
-                    end
-                    
-                    // === BLACK CHEVRON OUTLINE (V-shape, 3-4px thick) ===
-                    // Left arm: from (6, 12) to (20, 24)
-                    // Right arm: from (34, 12) to (20, 24)
-                    else if (((emblem_sprite_y >= 12 && emblem_sprite_y <= 25)) &&
-                             (// Left arm black outline (4px wide diagonal)
-                              ((emblem_sprite_x >= (5 + (24 - emblem_sprite_y))) && 
-                               (emblem_sprite_x <= (8 + (24 - emblem_sprite_y)))) ||
-                              // Right arm black outline (4px wide diagonal)
-                              ((emblem_sprite_x >= (32 - (24 - emblem_sprite_y))) && 
-                               (emblem_sprite_x <= (35 - (24 - emblem_sprite_y)))))) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b00; emblem_g <= 2'b00; emblem_b <= 2'b00; // Black #000000
-                    end
-                    
-                    // === WHITE INNER BORDER (between black outline and gold field) ===
-                    else if (
-                        // Top inner border (y=2): just inside black outline
-                        ((emblem_sprite_y == 2) && 
-                         (emblem_sprite_x >= 1 && emblem_sprite_x <= 38)) ||
-                        // Upper sides inner (y=3-15)
-                        ((emblem_sprite_y >= 3 && emblem_sprite_y <= 15) && 
-                         ((emblem_sprite_x == 1) || (emblem_sprite_x == 38))) ||
-                        // Middle sides inner (y=16-30)
-                        ((emblem_sprite_y >= 16 && emblem_sprite_y <= 30) && 
-                         ((emblem_sprite_x == 1) || (emblem_sprite_x == 38))) ||
-                        // Lower sides taper inner (y=31-35)
-                        ((emblem_sprite_y >= 31 && emblem_sprite_y <= 35) && 
-                         ((emblem_sprite_x == (1 + (emblem_sprite_y - 30))) || 
-                          (emblem_sprite_x == (38 - (emblem_sprite_y - 30))))) ||
-                        // Lower taper inner (y=36-42)
-                        ((emblem_sprite_y >= 36 && emblem_sprite_y <= 42) && 
-                         ((emblem_sprite_x == (6 + (emblem_sprite_y - 35))) || 
-                          (emblem_sprite_x == (33 - (emblem_sprite_y - 35))))) ||
-                        // Bottom approach inner (y=43-45)
-                        ((emblem_sprite_y >= 43 && emblem_sprite_y <= 45) && 
-                         ((emblem_sprite_x == (14 + (emblem_sprite_y - 43))) || 
-                          (emblem_sprite_x == (25 - (emblem_sprite_y - 43)))))
-                    ) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11; // White inner border #FFFFFF
-                    end
-                    
-                    // === GOLD FIELD BACKGROUND (inside shield, behind everything) ===
-                    // Shield shape: heater shield with curved sides and pointed bottom
-                    // Top is flat/straight, sides taper inward gradually, bottom comes to point at center
-                    else if (
-                        // Top section (y=3-15): full width inside borders
-                        ((emblem_sprite_y >= 3 && emblem_sprite_y <= 15) && 
-                         (emblem_sprite_x >= 2 && emblem_sprite_x <= 37)) ||
-                        // Middle section (y=16-30): full width
-                        ((emblem_sprite_y >= 16 && emblem_sprite_y <= 30) && 
-                         (emblem_sprite_x >= 2 && emblem_sprite_x <= 37)) ||
-                        // Lower start taper (y=31-35)
-                        ((emblem_sprite_y >= 31 && emblem_sprite_y <= 35) && 
-                         (emblem_sprite_x >= (2 + (emblem_sprite_y - 30)) && 
-                          emblem_sprite_x <= (37 - (emblem_sprite_y - 30)))) ||
-                        // Lower taper (y=36-42): curves to point
-                        ((emblem_sprite_y >= 36 && emblem_sprite_y <= 42) && 
-                         (emblem_sprite_x >= (7 + (emblem_sprite_y - 35)) && 
-                          emblem_sprite_x <= (32 - (emblem_sprite_y - 35)))) ||
-                        // Bottom approach (y=43-45): narrowing
-                        ((emblem_sprite_y >= 43 && emblem_sprite_y <= 45) && 
-                         (emblem_sprite_x >= (15 + (emblem_sprite_y - 43)) && 
-                          emblem_sprite_x <= (24 - (emblem_sprite_y - 43))))
-                    ) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b11; emblem_g <= 2'b10; emblem_b <= 2'b00; // Gold #FFAA00 (orange-gold)
-                    end
-                    
-                    // === BLACK SHIELD OUTLINE (thin, follows shield curve) ===
-                    else if (
-                        // Top edge (y=0-1): thin top border
-                        ((emblem_sprite_y <= 1) && 
-                         (emblem_sprite_x >= 2 && emblem_sprite_x <= 37)) ||
-                        // Top corners (y=0-1)
-                        ((emblem_sprite_y <= 1) && 
-                         ((emblem_sprite_x <= 1) || (emblem_sprite_x >= 38))) ||
-                        // Upper sides (y=2-15): straight sides
-                        ((emblem_sprite_y >= 2 && emblem_sprite_y <= 15) && 
-                         ((emblem_sprite_x == 0) || (emblem_sprite_x == 39))) ||
-                        // Middle sides (y=16-30): slight taper
-                        ((emblem_sprite_y >= 16 && emblem_sprite_y <= 30) && 
-                         ((emblem_sprite_x == 0) || (emblem_sprite_x == 39))) ||
-                        // Lower sides start taper (y=31-35)
-                        ((emblem_sprite_y >= 31 && emblem_sprite_y <= 35) && 
-                         ((emblem_sprite_x == (emblem_sprite_y - 30)) || 
-                          (emblem_sprite_x == (39 - (emblem_sprite_y - 30))))) ||
-                        // Lower taper (y=36-42): curves inward to point
-                        ((emblem_sprite_y >= 36 && emblem_sprite_y <= 42) && 
-                         ((emblem_sprite_x == (5 + (emblem_sprite_y - 35))) || 
-                          (emblem_sprite_x == (34 - (emblem_sprite_y - 35))))) ||
-                        // Bottom approach (y=43-45): narrowing to tip
-                        ((emblem_sprite_y >= 43 && emblem_sprite_y <= 45) && 
-                         ((emblem_sprite_x == (13 + (emblem_sprite_y - 43))) || 
-                          (emblem_sprite_x == (26 - (emblem_sprite_y - 43))))) ||
-                        // Bottom tip (y=46-47): point
-                        ((emblem_sprite_y >= 46 && emblem_sprite_y <= 47) && 
-                         ((emblem_sprite_x == 19) || (emblem_sprite_x == 20)))
-                    ) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b00; emblem_g <= 2'b00; emblem_b <= 2'b00; // Black outline #000000
-                    end
-                end
+                {emblem_r, emblem_g, emblem_b} <= emblem_rgb;
             end
         end
     end
 end
 
 endmodule
+
+
+

@@ -8,33 +8,29 @@
 module scroll (
     input wire halt,
     output reg [10:0] pos,
-    // speed output removed as it's unused externally
-
-    input wire [7:0] speed_change,
-    input wire [7:0] move_amt,
 
     input wire game_rst,
     input wire clk,
     input wire sys_rst
 );
 
-localparam INITIAL_SPEED = 250000; // 10ms at 25MHz
+localparam [17:0] SCROLL_PERIOD = 18'd250000; // 10ms at 25MHz
+localparam [10:0] MOVE_STEP = 11'd2;          // Pixels per tick
 
 reg [17:0] ctr;
-reg [17:0] tick_time;
 
 always @(posedge clk) begin
     if (game_rst || sys_rst) begin
         pos <= 11'd0;
         ctr <= 18'd0;
-        tick_time <= INITIAL_SPEED;
     end
     else if (!halt) begin
-        ctr <= ctr + 18'd1;
-        if (ctr >= tick_time) begin
+        if (ctr >= SCROLL_PERIOD) begin
             ctr <= 18'd0;
-            tick_time <= tick_time - {10'd0, speed_change};
-            pos <= pos + {3'd0, move_amt};
+            pos <= pos + MOVE_STEP;
+        end
+        else begin
+            ctr <= ctr + 18'd1;
         end
     end
 end
