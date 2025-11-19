@@ -55,8 +55,7 @@ assign game_start_blink = (start_ctr >= START_TIME) || start_ctr[22] || game_ove
 // ============================================================================
 
 // Obstacle dimensions (must match rendering.v)
-localparam ION_WIDTH = 20;
-localparam UW_WIDTH = 30;
+localparam UW_WIDTH = 40;
 
 reg [1:0] obstacle_select_last;
 
@@ -67,13 +66,7 @@ always @(posedge clk) begin
         obstacle_select_last <= 2'd0;
     end
     else begin
-        // Obstacle 0: ION railway
-        if (scrolladdr[9:0] < 10'd10) begin
-            obstacle_select[0] <= 1'b1;
-        end
-        else if (scrolladdr[9:0] > (10'd640 + ION_WIDTH)) begin
-            obstacle_select[0] <= 1'b0;
-        end
+        obstacle_select[0] <= 1'b0;
 
         // Obstacle 1: UW emblem (spawns at 250 offset)
         if (scrolladdr[9:0] >= 10'd250 && scrolladdr[9:0] < 10'd260) begin
@@ -84,9 +77,6 @@ always @(posedge clk) begin
         end
 
         // Generate new obstacle types when obstacles spawn
-        if (obstacle_select[0] && !obstacle_select_last[0]) begin
-            obstacle_type[0] <= random[0];  // ION railway type
-        end
         if (obstacle_select[1] && !obstacle_select_last[1]) begin
             obstacle_type[1] <= random[1];  // UW emblem type
         end
@@ -142,4 +132,3 @@ always @(posedge clk) begin
 end
 
 endmodule
-
