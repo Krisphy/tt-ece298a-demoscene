@@ -32,8 +32,7 @@ GOOSE_SOURCES = $(SRC_DIR)/goose_game_top.v \
                 $(SRC_DIR)/rendering.v \
                 $(SRC_DIR)/hvsync_generator.v \
                 $(SRC_DIR)/jumping.v \
-                $(SRC_DIR)/scroll.v \
-                $(SRC_DIR)/rng.v
+                $(SRC_DIR)/scroll.v
 
 # VGA demo sources (simple color pattern demo)
 VGADEMO_SOURCES = $(SRC_DIR)/vga_example.v \

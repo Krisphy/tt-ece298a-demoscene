@@ -38,7 +38,7 @@ module game_controller (
 
 localparam START_TIME = 30000000;  // ~1.2 seconds at 25MHz
 
-reg [31:0] start_ctr;
+reg [24:0] start_ctr;
 reg [19:0] no_jump_ctr;
 
 assign game_reset = game_over & jump_button & (no_jump_ctr > 20'd100000);
@@ -82,7 +82,7 @@ always @(posedge clk) begin
     else begin
         // Start counter for initial delay
         if (start_ctr < START_TIME) begin
-            start_ctr <= start_ctr + 32'd1;
+            start_ctr <= start_ctr + 25'd1;
         end
 
         // Game running state - Logic removed as output is unused
