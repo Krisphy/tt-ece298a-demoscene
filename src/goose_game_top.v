@@ -104,7 +104,7 @@ module tt_um_goose_game(
     .jump_button(jump_button),
     .halt_button(halt_button),
     .collision(collision),
-    .scrolladdr(scrolladdr),
+    .scrolladdr(scrolladdr[9:0]),
     .game_over(game_over),
     .game_reset(game_reset),
     .game_halt(game_halt),

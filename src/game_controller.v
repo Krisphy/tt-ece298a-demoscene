@@ -20,7 +20,7 @@ module game_controller (
     
     // Inputs from other modules
     input wire collision,
-    input wire [10:0] scrolladdr,
+    input wire [9:0] scrolladdr,
     
     // Game state outputs
     output reg game_over,
@@ -51,8 +51,6 @@ assign game_start_blink = (start_ctr >= START_TIME) || start_ctr[22] || game_ove
 
 // Obstacle dimensions (must match rendering.v)
 localparam UW_WIDTH = 40;
-
-wire _unused_scroll_bit = scrolladdr[10];
 
 always @(posedge clk) begin
     if (!rst_n) begin

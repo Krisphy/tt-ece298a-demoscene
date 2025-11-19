@@ -92,21 +92,19 @@ assign G = display_on ? final_g : 2'b00;
 assign B = display_on ? final_b : 2'b00;
 
 wire [10:0] goose_y = GOOSE_Y_BASE - {4'd0, jump_pos};
-wire [10:0] floor_scroll = haddr + scrolladdr;
-wire [6:0] flooraddr = floor_scroll[6:0];  // Floor texture address
+wire [6:0] flooraddr = 7'(haddr + scrolladdr); // Floor texture address (lower 7 bits)
 wire [10:0] obs2_x = 11'd640 - scrolladdr + 11'd250;
 
 // Goose sprite coordinates (for color calculation)
-// Using implicit truncation for diff calculation to avoid unused bit warnings
 wire [5:0] goose_diff_y = 6'({1'b0, vaddr} - goose_y); 
-wire [4:0] goose_diff_x = 5'({1'b0, haddr} - GOOSE_X);
+wire [4:0] goose_diff_x = 5'({1'b0, haddr} - 11'(GOOSE_X));
 wire [5:0] goose_sprite_y = ({1'b0, vaddr} >= goose_y && {1'b0, vaddr} < (goose_y + GOOSE_HEIGHT)) ?
                             goose_diff_y : 6'd0;
 wire [4:0] goose_sprite_x = ({1'b0, haddr} >= GOOSE_X && {1'b0, haddr} < (GOOSE_X + GOOSE_WIDTH)) ?
                             goose_diff_x : 5'd0;
 
 // Emblem sprite coordinates (for obstacle 2)
-wire [5:0] emblem_diff_y = 6'({1'b0, vaddr} - (FLOOR_Y - UW_HEIGHT));
+wire [5:0] emblem_diff_y = 6'({1'b0, vaddr} - 11'(FLOOR_Y - UW_HEIGHT));
 wire [5:0] emblem_diff_x = 6'({1'b0, haddr} - obs2_x);
 wire [5:0] emblem_sprite_y = ({1'b0, vaddr} >= (FLOOR_Y - UW_HEIGHT) && vaddr < FLOOR_Y) ?
                              emblem_diff_y : 6'd0;
