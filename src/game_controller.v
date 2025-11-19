@@ -5,7 +5,6 @@
  * - Game state FSM (running, game over, reset)
  * - Obstacle spawn/despawn
  * - Collision handling
- * - Obstacle type randomization
  */
 
 `default_nettype none
@@ -22,7 +21,8 @@ module game_controller (
     // Inputs from other modules
     input wire collision,
     input wire [10:0] scrolladdr,
-    input wire [4:0] random,
+    /* verilator lint_off UNUSEDSIGNAL */
+    // random is no longer used as we removed obstacle types
     
     // Game state outputs
     output reg game_over,
@@ -32,8 +32,7 @@ module game_controller (
     output reg game_running,
     
     // Obstacle state outputs
-    output reg [1:0] obstacle_select,
-    output reg [1:0] obstacle_type
+    output reg obstacle_active
 );
 
 // ============================================================================
@@ -56,41 +55,18 @@ assign game_start_blink = (start_ctr >= START_TIME) || start_ctr[22] || game_ove
 // Obstacle dimensions (must match rendering.v)
 localparam UW_WIDTH = 40;
 
-reg [1:0] obstacle_select_last;
-
 always @(posedge clk) begin
     if (!rst_n) begin
-        obstacle_select <= 2'd0;
-        obstacle_type <= 2'd0;
-        obstacle_select_last <= 2'd0;
+        obstacle_active <= 1'b0;
     end
     else begin
-        obstacle_select[0] <= 1'b0;
-
         // Obstacle 1: UW emblem (spawns at 250 offset)
+        // We use only scrolladdr[9:0], ignoring bit 10 which is effectively unused for this check
         if (scrolladdr[9:0] >= 10'd250 && scrolladdr[9:0] < 10'd260) begin
-            obstacle_select[1] <= 1'b1;
+            obstacle_active <= 1'b1;
         end
         else if (scrolladdr[9:0] > (10'd640 + 10'd250 + UW_WIDTH)) begin
-            obstacle_select[1] <= 1'b0;
-        end
-
-        // Generate new obstacle types when obstacles spawn
-        if (obstacle_select[1] && !obstacle_select_last[1]) begin
-            obstacle_type[1] <= random[1];  // UW emblem type
-        end
-        
-        // Prevent unused signal warnings by ORing unused bits
-        // random[0], random[4:2], scrolladdr[10] are unused
-        if (random[0] | |random[4:2] | scrolladdr[10]) begin
-             // dummy logic to keep signals connected
-        end
-        
-        obstacle_select_last <= obstacle_select;
-        
-        // Reset obstacle types on game reset
-        if (game_reset) begin
-            obstacle_type <= 2'd0;
+            obstacle_active <= 1'b0;
         end
     end
 end

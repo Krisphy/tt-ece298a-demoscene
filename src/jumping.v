@@ -29,10 +29,11 @@ reg [8:0] frame;
 reg [6:0] y_table[25:0];  // Only store ascent, mirror for descent
 
 // Wire to compute table index with mirroring
-wire [8:0] table_idx;
+wire [4:0] table_idx;
 // Ascent: frames 0-25 → table[0-25]
 // Descent: frames 26-50 → table[24-0] (mirrored, skip peak twice)
-assign table_idx = (frame <= 9'd25) ? frame : (9'd50 - frame);
+// Note: 50 mod 32 is 18. Using 5-bit arithmetic intentionally to match widths and avoid unused bit warnings.
+assign table_idx = (frame <= 9'd25) ? frame[4:0] : (5'd18 - frame[4:0]);
 
 always @(posedge clk) begin
     if (game_rst || sys_rst) begin
@@ -42,7 +43,7 @@ always @(posedge clk) begin
         jump_pos <= 7'd0;
     end
     else begin
-        jump_pos <= y_table[table_idx[4:0]];
+        jump_pos <= y_table[table_idx];
 
         if (!halt) begin
             if (in_air) begin

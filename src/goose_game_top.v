@@ -55,12 +55,11 @@ module tt_um_goose_game(
   wire game_halt;
   wire game_start_blink;
   wire game_running;
-  wire [1:0] obstacle_select;
-  wire [1:0] obstacle_type;
+  wire obstacle_active;
   
   // From jumping
   wire [6:0] jump_pos;
-  wire in_air;
+  // in_air is internal to jumping module logic, not needed at top level
   
   // From scroll
   wire [10:0] scrolladdr;
@@ -82,9 +81,11 @@ module tt_um_goose_game(
   // Bidirectional pins unused
   assign uio_out = 8'b0;
   assign uio_oe = 8'b0;
-
-  // Suppress unused signals warning
-  wire _unused_ok = &{ena, ui_in[7:2], uio_in, speed, game_running};
+  
+  /* verilator lint_off UNUSEDSIGNAL */
+  // Suppress unused signals warning for standard interface
+  wire _unused_ok = &{ena, ui_in[7:2], uio_in};
+  /* verilator lint_on UNUSEDSIGNAL */
 
   // ============================================================================
   // Module Instantiations
@@ -109,14 +110,13 @@ module tt_um_goose_game(
     .halt_button(halt_button),
     .collision(collision),
     .scrolladdr(scrolladdr),
-    .random(random),
+    // random input removed from game_controller
     .game_over(game_over),
     .game_reset(game_reset),
     .game_halt(game_halt),
     .game_start_blink(game_start_blink),
     .game_running(game_running),
-    .obstacle_select(obstacle_select),
-    .obstacle_type(obstacle_type)
+    .obstacle_active(obstacle_active)
   );
 
   // Jump physics
@@ -124,7 +124,7 @@ module tt_um_goose_game(
     .speed(24'd250000),
     .jump(jump_button),
     .jump_pos(jump_pos),
-    .in_air(in_air),
+    .in_air(), // Output unused at top level
     .halt(game_halt),
     .game_rst(game_reset),
     .clk(clk),
@@ -132,8 +132,13 @@ module tt_um_goose_game(
   );
 
   // Scrolling logic
+  // speed input is driven by the wire speed? Wait, scroll has input speed?
+  // Checking scroll.v: output wire [23:0] speed.
+  // Ah, scroll PRODUCES speed.
+  // My previous analysis was wrong. scroll.v line 11: output wire [23:0] speed.
+  // So scroll instantiaton needs to CONNECT to wire speed.
   scroll scroll_inst (
-    .speed(speed),
+    .speed(speed), // Output from scroll
     .pos(scrolladdr),
     .halt(game_halt),
     .speed_change(8'd4),  // Acceleration
@@ -159,7 +164,7 @@ module tt_um_goose_game(
     .collision(collision),
     .game_over(game_over),
     .game_start_blink(game_start_blink),
-    .obstacle_select(obstacle_select),
+    .obstacle_active(obstacle_active),
     .jump_pos(jump_pos),
     .vaddr(vpos),
     .haddr(hpos),
@@ -170,4 +175,3 @@ module tt_um_goose_game(
   );
 
 endmodule
-

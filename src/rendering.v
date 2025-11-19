@@ -21,7 +21,7 @@ module rendering (
     input wire game_over,
     input wire game_start_blink,
 
-    input wire [1:0] obstacle_select,  // From game_controller
+    input wire obstacle_active,  // From game_controller (was obstacle_select)
     input wire [6:0] jump_pos,
     input wire [9:0] vaddr,
     input wire [9:0] haddr,
@@ -51,9 +51,13 @@ localparam FLOOR_Y = 240;
 // Pattern repeats twice horizontally across screen
 reg [127:0] floor_pattern[3:0];
 
-// Layer outputs (priority order: 0=highest, 5=lowest)
-// [0]=goose, [2]=UW emblem, [3]=floor_texture, [4]=floor, [5]=sky
-reg [5:0] layers;  
+// Layer outputs (priority order: goose, obstacle, floor_texture, floor, sky)
+localparam integer LAYER_GOOSE = 0;
+localparam integer LAYER_OBSTACLE = 1;
+localparam integer LAYER_FLOOR_TEXTURE = 2;
+localparam integer LAYER_FLOOR = 3;
+localparam integer LAYER_SKY = 4;
+reg [4:0] layers;
 
 // Goose per-pixel colors (for shading)
 reg [1:0] goose_r, goose_g, goose_b;
@@ -61,58 +65,57 @@ reg [1:0] goose_r, goose_g, goose_b;
 reg [1:0] emblem_r, emblem_g, emblem_b;
 
 // Collision: goose hits UW emblem
-assign collision = layers[0] & layers[2];
+assign collision = layers[LAYER_GOOSE] & layers[LAYER_OBSTACLE];
 
 // Composite all layers with colors (priority order: goose, obstacles, floor texture, floor, sky)
 wire [1:0] final_r, final_g, final_b;
-assign final_r = (layers[0] ? goose_r :        // Goose (with shading)
-                  layers[2] ? emblem_r :       // UW emblem (with colors)
-                  layers[3] ? 2'b11 :           // Floor texture: white R=11
-                  layers[4] ? 2'b01 :           // Floor: R=01
-                  layers[5] ? 2'b00 : 2'b00);   // Sky: R=00
+assign final_r = (layers[LAYER_GOOSE] ? goose_r :        // Goose (with shading)
+                  layers[LAYER_OBSTACLE] ? emblem_r :    // UW emblem (with colors)
+                  layers[LAYER_FLOOR_TEXTURE] ? 2'b11 :  // Floor texture: white R=11
+                  layers[LAYER_FLOOR] ? 2'b01 :          // Floor: R=01
+                  layers[LAYER_SKY] ? 2'b00 : 2'b00);    // Sky: R=00
 
-assign final_g = (layers[0] ? goose_g :        // Goose (with shading)
-                  layers[2] ? emblem_g :       // UW emblem (with colors)
-                  layers[3] ? 2'b11 :           // Floor texture: white G=11
-                  layers[4] ? 2'b01 :           // Floor: G=01
-                  layers[5] ? 2'b11 : 2'b00);   // Sky: G=11
+assign final_g = (layers[LAYER_GOOSE] ? goose_g :        // Goose (with shading)
+                  layers[LAYER_OBSTACLE] ? emblem_g :    // UW emblem (with colors)
+                  layers[LAYER_FLOOR_TEXTURE] ? 2'b11 :  // Floor texture: white G=11
+                  layers[LAYER_FLOOR] ? 2'b01 :          // Floor: G=01
+                  layers[LAYER_SKY] ? 2'b11 : 2'b00);    // Sky: G=11
 
-assign final_b = (layers[0] ? goose_b :        // Goose (with shading)
-                  layers[2] ? emblem_b :       // UW emblem (with colors)
-                  layers[3] ? 2'b11 :           // Floor texture: white B=11
-                  layers[4] ? 2'b01 :           // Floor: B=01
-                  layers[5] ? 2'b11 : 2'b00);   // Sky: B=11
+assign final_b = (layers[LAYER_GOOSE] ? goose_b :        // Goose (with shading)
+                  layers[LAYER_OBSTACLE] ? emblem_b :    // UW emblem (with colors)
+                  layers[LAYER_FLOOR_TEXTURE] ? 2'b11 :  // Floor texture: white B=11
+                  layers[LAYER_FLOOR] ? 2'b01 :          // Floor: B=01
+                  layers[LAYER_SKY] ? 2'b11 : 2'b00);    // Sky: B=11
 
 assign R = display_on ? final_r : 2'b00;
 assign G = display_on ? final_g : 2'b00;
 assign B = display_on ? final_b : 2'b00;
 
 wire [10:0] goose_y = GOOSE_Y_BASE - {4'd0, jump_pos};
-wire [10:0] floor_scroll = haddr + scrolladdr;  // Floor pattern scrolls left with world
-wire [7:0] flooraddr = floor_scroll[7:0];       // Floor texture address
+wire [10:0] floor_scroll = haddr + scrolladdr;
+wire [6:0] flooraddr = floor_scroll[6:0];  // Floor texture address
 wire [10:0] obs2_x = 11'd640 - scrolladdr + 11'd250;
 
 // Goose sprite coordinates (for color calculation)
-wire [5:0] goose_sprite_y;
-wire [4:0] goose_sprite_x;
-wire [10:0] goose_diff_y = {1'b0, vaddr} - goose_y;
-wire [10:0] goose_diff_x = {1'b0, haddr} - GOOSE_X;
-
-assign goose_sprite_y = ({1'b0, vaddr} >= goose_y && {1'b0, vaddr} < (goose_y + GOOSE_HEIGHT)) ? goose_diff_y[5:0] : 6'd0;
-assign goose_sprite_x = ({1'b0, haddr} >= GOOSE_X && {1'b0, haddr} < (GOOSE_X + GOOSE_WIDTH)) ? goose_diff_x[4:0] : 5'd0;
+// Using implicit truncation for diff calculation to avoid unused bit warnings
+wire [5:0] goose_diff_y = 6'({1'b0, vaddr} - goose_y); 
+wire [4:0] goose_diff_x = 5'({1'b0, haddr} - GOOSE_X);
+wire [5:0] goose_sprite_y = ({1'b0, vaddr} >= goose_y && {1'b0, vaddr} < (goose_y + GOOSE_HEIGHT)) ?
+                            goose_diff_y : 6'd0;
+wire [4:0] goose_sprite_x = ({1'b0, haddr} >= GOOSE_X && {1'b0, haddr} < (GOOSE_X + GOOSE_WIDTH)) ?
+                            goose_diff_x : 5'd0;
 
 // Emblem sprite coordinates (for obstacle 2)
-wire [5:0] emblem_sprite_y;
-wire [5:0] emblem_sprite_x;
-wire [10:0] emblem_diff_y = {1'b0, vaddr} - (FLOOR_Y - UW_HEIGHT);
-wire [10:0] emblem_diff_x = {1'b0, haddr} - obs2_x;
-
-assign emblem_sprite_y = ({1'b0, vaddr} >= (FLOOR_Y - UW_HEIGHT) && vaddr < FLOOR_Y) ? emblem_diff_y[5:0] : 6'd0;
-assign emblem_sprite_x = ({1'b0, haddr} >= obs2_x && {1'b0, haddr} < (obs2_x + UW_WIDTH)) ? emblem_diff_x[5:0] : 6'd0;
+wire [5:0] emblem_diff_y = 6'({1'b0, vaddr} - (FLOOR_Y - UW_HEIGHT));
+wire [5:0] emblem_diff_x = 6'({1'b0, haddr} - obs2_x);
+wire [5:0] emblem_sprite_y = ({1'b0, vaddr} >= (FLOOR_Y - UW_HEIGHT) && vaddr < FLOOR_Y) ?
+                             emblem_diff_y : 6'd0;
+wire [5:0] emblem_sprite_x = ({1'b0, haddr} >= obs2_x && {1'b0, haddr} < (obs2_x + UW_WIDTH)) ?
+                             emblem_diff_x : 6'd0;
 
 always @(posedge clk) begin
     if (sys_rst) begin
-        layers <= 6'd0;
+        layers <= 5'd0;
         goose_r <= 2'b00;
         goose_g <= 2'b00;
         goose_b <= 2'b00;
@@ -121,7 +124,7 @@ always @(posedge clk) begin
         emblem_b <= 2'b00;
     end
     else begin
-        layers <= 6'd0;
+        layers <= 5'd0;
         
         // Default goose colors (will be overridden if goose is drawn)
         goose_r <= 2'b11;
@@ -131,19 +134,19 @@ always @(posedge clk) begin
         if (display_on) begin
             // Layer 5: Sky background (everything above ground)
             if (vaddr < FLOOR_Y) begin
-                layers[5] <= 1'b1;
+                layers[LAYER_SKY] <= 1'b1;
             end
             
             // Layer 4: Ground area (everything at or below FLOOR_Y) - solid dark grey
             if (vaddr >= FLOOR_Y) begin
-                layers[4] <= 1'b1;
+                layers[LAYER_FLOOR] <= 1'b1;
             end
             
             // Layer 3: Floor texture (reduced pattern on first 4 rows of ground)
             if (vaddr >= FLOOR_Y && vaddr < (FLOOR_Y + 4)) begin
                 // Index into 128-bit repeating pattern using lower 7 bits of scroll position
                 // Pattern repeats twice across the 256-pixel horizontal space
-                layers[3] <= floor_pattern[vaddr - FLOOR_Y][flooraddr[6:0]];
+                layers[LAYER_FLOOR_TEXTURE] <= floor_pattern[vaddr - FLOOR_Y][flooraddr];
             end
             
             // Layer 0: Goose sprite
@@ -154,7 +157,7 @@ always @(posedge clk) begin
                 // Body (Brown)
                 if (goose_sprite_y >= 20 && goose_sprite_y <= 35 &&
                     goose_sprite_x >= 5 && goose_sprite_x <= 25) begin
-                    layers[0] <= 1'b1;
+                    layers[LAYER_GOOSE] <= 1'b1;
                     if (game_over) begin
                         goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
                     end else begin
@@ -164,7 +167,7 @@ always @(posedge clk) begin
                 // Neck (Black)
                 else if (goose_sprite_y >= 10 && goose_sprite_y < 20 &&
                          goose_sprite_x >= 18 && goose_sprite_x <= 22) begin
-                    layers[0] <= 1'b1;
+                    layers[LAYER_GOOSE] <= 1'b1;
                     if (game_over) begin
                          goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
                     end else begin
@@ -174,7 +177,7 @@ always @(posedge clk) begin
                 // Head (Black)
                 else if (goose_sprite_y >= 5 && goose_sprite_y < 10 &&
                          goose_sprite_x >= 18 && goose_sprite_x <= 26) begin
-                    layers[0] <= 1'b1;
+                    layers[LAYER_GOOSE] <= 1'b1;
                     if (game_over) begin
                          goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
                     end else begin
@@ -184,7 +187,7 @@ always @(posedge clk) begin
                 // Beak (Orange)
                 else if (goose_sprite_y >= 7 && goose_sprite_y <= 9 &&
                          goose_sprite_x >= 26 && goose_sprite_x <= 29) begin
-                    layers[0] <= 1'b1;
+                    layers[LAYER_GOOSE] <= 1'b1;
                     if (game_over) begin
                          goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
                     end else begin
@@ -195,7 +198,7 @@ always @(posedge clk) begin
                 else if (goose_sprite_y > 35 && goose_sprite_y <= 39 &&
                          ((goose_sprite_x >= 10 && goose_sprite_x <= 12) ||
                           (goose_sprite_x >= 18 && goose_sprite_x <= 20))) begin
-                    layers[0] <= 1'b1;
+                    layers[LAYER_GOOSE] <= 1'b1;
                     if (game_over) begin
                          goose_r <= 2'b11; goose_g <= 2'b00; goose_b <= 2'b00;
                     end else begin
@@ -205,7 +208,7 @@ always @(posedge clk) begin
             end
 
             // Layer 2: UW emblem obstacle (shield with coat of arms) - 40×48 pixels
-            if (obstacle_select[1]) begin
+            if (obstacle_active) begin
                 if ({1'b0, haddr} >= obs2_x && {1'b0, haddr} < (obs2_x + UW_WIDTH) &&
                     vaddr >= (FLOOR_Y - UW_HEIGHT) && vaddr < FLOOR_Y) begin
                     
@@ -222,7 +225,7 @@ always @(posedge clk) begin
                          ((emblem_sprite_y >= 7 && emblem_sprite_y <= 9) && (emblem_sprite_x >= 12 && emblem_sprite_x <= 14)) ||
                          // Raised paw: 2×2
                          ((emblem_sprite_y >= 9 && emblem_sprite_y <= 10) && (emblem_sprite_x >= 14 && emblem_sprite_x <= 15)))) begin
-                        layers[2] <= 1'b1;
+                        layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00; // Red #AA0000
                     end
                     // Upper-right lion: centered ~(29, 10), mirrored
@@ -234,7 +237,7 @@ always @(posedge clk) begin
                               ((emblem_sprite_y >= 7 && emblem_sprite_y <= 9) && (emblem_sprite_x >= 26 && emblem_sprite_x <= 28)) ||
                               // Raised paw: 2×2
                               ((emblem_sprite_y >= 9 && emblem_sprite_y <= 10) && (emblem_sprite_x >= 25 && emblem_sprite_x <= 26)))) begin
-                        layers[2] <= 1'b1;
+                        layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00; // Red #AA0000
                     end
                     // Lower-center lion: centered ~(20, 32), slightly larger 12×10
@@ -247,7 +250,7 @@ always @(posedge clk) begin
                               // Paws: 2×2 each side
                               ((emblem_sprite_y >= 32 && emblem_sprite_y <= 33) && 
                                ((emblem_sprite_x >= 15 && emblem_sprite_x <= 16) || (emblem_sprite_x >= 24 && emblem_sprite_x <= 25))))) begin
-                        layers[2] <= 1'b1;
+                        layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00; // Red #AA0000
                     end
                     
@@ -261,7 +264,7 @@ always @(posedge clk) begin
                               // Right arm white fill
                               ((emblem_sprite_x >= (30 - (23 - emblem_sprite_y))) && 
                                (emblem_sprite_x <= (32 - (23 - emblem_sprite_y)))))) begin
-                        layers[2] <= 1'b1;
+                        layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11; // White #FFFFFF
                     end
                     
@@ -275,7 +278,7 @@ always @(posedge clk) begin
                               // Right arm black outline (4px wide diagonal)
                               ((emblem_sprite_x >= (32 - (24 - emblem_sprite_y))) && 
                                (emblem_sprite_x <= (35 - (24 - emblem_sprite_y)))))) begin
-                        layers[2] <= 1'b1;
+                        layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b00; emblem_g <= 2'b00; emblem_b <= 2'b00; // Black #000000
                     end
                     
@@ -303,7 +306,7 @@ always @(posedge clk) begin
                          ((emblem_sprite_x == (14 + (emblem_sprite_y - 43))) || 
                           (emblem_sprite_x == (25 - (emblem_sprite_y - 43)))))
                     ) begin
-                        layers[2] <= 1'b1;
+                        layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11; // White inner border #FFFFFF
                     end
                     
@@ -330,7 +333,7 @@ always @(posedge clk) begin
                          (emblem_sprite_x >= (15 + (emblem_sprite_y - 43)) && 
                           emblem_sprite_x <= (24 - (emblem_sprite_y - 43))))
                     ) begin
-                        layers[2] <= 1'b1;
+                        layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b11; emblem_g <= 2'b10; emblem_b <= 2'b00; // Gold #FFAA00 (orange-gold)
                     end
                     
@@ -364,7 +367,7 @@ always @(posedge clk) begin
                         ((emblem_sprite_y >= 46 && emblem_sprite_y <= 47) && 
                          ((emblem_sprite_x == 19) || (emblem_sprite_x == 20)))
                     ) begin
-                        layers[2] <= 1'b1;
+                        layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b00; emblem_g <= 2'b00; emblem_b <= 2'b00; // Black outline #000000
                     end
                 end
