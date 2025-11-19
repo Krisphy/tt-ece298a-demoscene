@@ -21,15 +21,12 @@ module game_controller (
     // Inputs from other modules
     input wire collision,
     input wire [10:0] scrolladdr,
-    /* verilator lint_off UNUSEDSIGNAL */
-    // random is no longer used as we removed obstacle types
     
     // Game state outputs
     output reg game_over,
     output wire game_reset,
     output wire game_halt,
     output wire game_start_blink,
-    output reg game_running,
     
     // Obstacle state outputs
     output reg obstacle_active
@@ -55,13 +52,15 @@ assign game_start_blink = (start_ctr >= START_TIME) || start_ctr[22] || game_ove
 // Obstacle dimensions (must match rendering.v)
 localparam UW_WIDTH = 40;
 
+wire _unused_scroll_bit = scrolladdr[10];
+
 always @(posedge clk) begin
     if (!rst_n) begin
         obstacle_active <= 1'b0;
     end
     else begin
         // Obstacle 1: UW emblem (spawns at 250 offset)
-        // We use only scrolladdr[9:0], ignoring bit 10 which is effectively unused for this check
+        // We use only scrolladdr[9:0]
         if (scrolladdr[9:0] >= 10'd250 && scrolladdr[9:0] < 10'd260) begin
             obstacle_active <= 1'b1;
         end
@@ -80,7 +79,7 @@ always @(posedge clk) begin
         game_over <= 1'b0;
         start_ctr <= 32'd0;
         no_jump_ctr <= 20'd0;
-        game_running <= 1'b0;
+        // game_running <= 1'b0;
     end
     else begin
         // Start counter for initial delay
@@ -88,8 +87,8 @@ always @(posedge clk) begin
             start_ctr <= start_ctr + 32'd1;
         end
 
-        // Game running state
-        game_running <= (start_ctr >= START_TIME) && !game_over;
+        // Game running state - Logic removed as output is unused
+        // game_running <= (start_ctr >= START_TIME) && !game_over;
 
         // Track jump button for reset detection
         if (jump_button) begin

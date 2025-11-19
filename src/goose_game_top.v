@@ -54,22 +54,17 @@ module tt_um_goose_game(
   wire game_reset;
   wire game_halt;
   wire game_start_blink;
-  wire game_running;
   wire obstacle_active;
   
   // From jumping
   wire [6:0] jump_pos;
-  // in_air is internal to jumping module logic, not needed at top level
   
   // From scroll
   wire [10:0] scrolladdr;
-  wire [23:0] speed;
   
   // From rendering
   wire collision;
   
-  // From rng
-  wire [4:0] random;
 
   // ============================================================================
   // Output Assignments
@@ -110,12 +105,10 @@ module tt_um_goose_game(
     .halt_button(halt_button),
     .collision(collision),
     .scrolladdr(scrolladdr),
-    // random input removed from game_controller
     .game_over(game_over),
     .game_reset(game_reset),
     .game_halt(game_halt),
     .game_start_blink(game_start_blink),
-    .game_running(game_running),
     .obstacle_active(obstacle_active)
   );
 
@@ -124,7 +117,6 @@ module tt_um_goose_game(
     .speed(24'd250000),
     .jump(jump_button),
     .jump_pos(jump_pos),
-    .in_air(), // Output unused at top level
     .halt(game_halt),
     .game_rst(game_reset),
     .clk(clk),
@@ -132,26 +124,12 @@ module tt_um_goose_game(
   );
 
   // Scrolling logic
-  // speed input is driven by the wire speed? Wait, scroll has input speed?
-  // Checking scroll.v: output wire [23:0] speed.
-  // Ah, scroll PRODUCES speed.
-  // My previous analysis was wrong. scroll.v line 11: output wire [23:0] speed.
-  // So scroll instantiaton needs to CONNECT to wire speed.
   scroll scroll_inst (
-    .speed(speed), // Output from scroll
     .pos(scrolladdr),
     .halt(game_halt),
     .speed_change(8'd4),  // Acceleration
     .move_amt(8'd2),      // Scroll speed
     .game_rst(game_reset),
-    .clk(clk),
-    .sys_rst(~rst_n)
-  );
-
-  // Random number generator for obstacle types
-  rng rng_inst (
-    .entropy_in(jump_button),
-    .out(random),
     .clk(clk),
     .sys_rst(~rst_n)
   );

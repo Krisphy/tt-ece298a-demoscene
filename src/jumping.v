@@ -16,7 +16,7 @@ module jumping (
     
     input wire [23:0] speed,
     output reg [6:0] jump_pos,
-    output reg in_air,
+    // in_air output removed as it's unused externally
 
     input wire game_rst,
     input wire clk,
@@ -25,6 +25,7 @@ module jumping (
 
 reg [23:0] ctr;
 reg [8:0] frame;
+reg in_air; // Internal state only
 
 reg [6:0] y_table[25:0];  // Only store ascent, mirror for descent
 
@@ -32,7 +33,6 @@ reg [6:0] y_table[25:0];  // Only store ascent, mirror for descent
 wire [4:0] table_idx;
 // Ascent: frames 0-25 → table[0-25]
 // Descent: frames 26-50 → table[24-0] (mirrored, skip peak twice)
-// Note: 50 mod 32 is 18. Using 5-bit arithmetic intentionally to match widths and avoid unused bit warnings.
 assign table_idx = (frame <= 9'd25) ? frame[4:0] : (5'd18 - frame[4:0]);
 
 always @(posedge clk) begin
@@ -102,4 +102,3 @@ initial begin
 end
 
 endmodule
-

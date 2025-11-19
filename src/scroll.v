@@ -8,7 +8,7 @@
 module scroll (
     input wire halt,
     output reg [10:0] pos,
-    output wire [23:0] speed,
+    // speed output removed as it's unused externally
 
     input wire [7:0] speed_change,
     input wire [7:0] move_amt,
@@ -22,8 +22,6 @@ localparam INITIAL_SPEED = 250000; // 10ms at 25MHz
 
 reg [17:0] ctr;
 reg [17:0] tick_time;
-
-assign speed = {6'd0, tick_time};
 
 always @(posedge clk) begin
     if (game_rst || sys_rst) begin
@@ -42,4 +40,3 @@ always @(posedge clk) begin
 end
 
 endmodule
-
