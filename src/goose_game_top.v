@@ -84,7 +84,7 @@ module tt_um_goose_game(
   assign uio_oe = 8'b0;
 
   // Suppress unused signals warning
-  wire _unused_ok = &{ena, ui_in[7:2], uio_in, speed};
+  wire _unused_ok = &{ena, ui_in[7:2], uio_in, speed, game_running};
 
   // ============================================================================
   // Module Instantiations
@@ -110,7 +110,6 @@ module tt_um_goose_game(
     .collision(collision),
     .scrolladdr(scrolladdr),
     .random(random),
-    .in_air(in_air),
     .game_over(game_over),
     .game_reset(game_reset),
     .game_halt(game_halt),
@@ -161,7 +160,6 @@ module tt_um_goose_game(
     .game_over(game_over),
     .game_start_blink(game_start_blink),
     .obstacle_select(obstacle_select),
-    .obstacle_type(obstacle_type),
     .jump_pos(jump_pos),
     .vaddr(vpos),
     .haddr(hpos),

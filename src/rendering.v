@@ -22,7 +22,6 @@ module rendering (
     input wire game_start_blink,
 
     input wire [1:0] obstacle_select,  // From game_controller
-    input wire [1:0] obstacle_type,
     input wire [6:0] jump_pos,
     input wire [9:0] vaddr,
     input wire [9:0] haddr,
@@ -46,7 +45,6 @@ localparam UW_HEIGHT = 48;
 
 // Floor position
 localparam FLOOR_Y = 240;
-localparam FLOOR_HEIGHT = 5;
 
 // Ground texture - reduced from original (saves ROM)
 // 4 rows × 128 bits = 512 bits
@@ -56,7 +54,6 @@ reg [127:0] floor_pattern[3:0];
 // Layer outputs (priority order: 0=highest, 5=lowest)
 // [0]=goose, [2]=UW emblem, [3]=floor_texture, [4]=floor, [5]=sky
 reg [5:0] layers;  
-reg [1:0] layer_colors [4:0];  // Color for each layer
 
 // Goose per-pixel colors (for shading)
 reg [1:0] goose_r, goose_g, goose_b;
@@ -101,8 +98,8 @@ wire [4:0] goose_sprite_x;
 wire [10:0] goose_diff_y = {1'b0, vaddr} - goose_y;
 wire [10:0] goose_diff_x = {1'b0, haddr} - GOOSE_X;
 
-assign goose_sprite_y = (vaddr >= goose_y && vaddr < (goose_y + GOOSE_HEIGHT)) ? goose_diff_y[5:0] : 6'd0;
-assign goose_sprite_x = (haddr >= GOOSE_X && haddr < (GOOSE_X + GOOSE_WIDTH)) ? goose_diff_x[4:0] : 5'd0;
+assign goose_sprite_y = ({1'b0, vaddr} >= goose_y && {1'b0, vaddr} < (goose_y + GOOSE_HEIGHT)) ? goose_diff_y[5:0] : 6'd0;
+assign goose_sprite_x = ({1'b0, haddr} >= GOOSE_X && {1'b0, haddr} < (GOOSE_X + GOOSE_WIDTH)) ? goose_diff_x[4:0] : 5'd0;
 
 // Emblem sprite coordinates (for obstacle 2)
 wire [5:0] emblem_sprite_y;
@@ -110,8 +107,8 @@ wire [5:0] emblem_sprite_x;
 wire [10:0] emblem_diff_y = {1'b0, vaddr} - (FLOOR_Y - UW_HEIGHT);
 wire [10:0] emblem_diff_x = {1'b0, haddr} - obs2_x;
 
-assign emblem_sprite_y = (vaddr >= (FLOOR_Y - UW_HEIGHT) && vaddr < FLOOR_Y) ? emblem_diff_y[5:0] : 6'd0;
-assign emblem_sprite_x = (haddr >= obs2_x && haddr < (obs2_x + UW_WIDTH)) ? emblem_diff_x[5:0] : 6'd0;
+assign emblem_sprite_y = ({1'b0, vaddr} >= (FLOOR_Y - UW_HEIGHT) && vaddr < FLOOR_Y) ? emblem_diff_y[5:0] : 6'd0;
+assign emblem_sprite_x = ({1'b0, haddr} >= obs2_x && {1'b0, haddr} < (obs2_x + UW_WIDTH)) ? emblem_diff_x[5:0] : 6'd0;
 
 always @(posedge clk) begin
     if (sys_rst) begin
@@ -125,10 +122,6 @@ always @(posedge clk) begin
     end
     else begin
         layers <= 6'd0;
-        
-        // Set default colors for layers
-        layer_colors[0] <= 2'b11;  // Goose - yellow/white
-        layer_colors[2] <= 2'b11;  // Emblem
         
         // Default goose colors (will be overridden if goose is drawn)
         goose_r <= 2'b11;
@@ -154,8 +147,8 @@ always @(posedge clk) begin
             end
             
             // Layer 0: Goose sprite
-            if (haddr >= GOOSE_X && haddr < (GOOSE_X + GOOSE_WIDTH) &&
-                vaddr >= goose_y && vaddr < (goose_y + GOOSE_HEIGHT) &&
+            if ({1'b0, haddr} >= GOOSE_X && {1'b0, haddr} < (GOOSE_X + GOOSE_WIDTH) &&
+                {1'b0, vaddr} >= goose_y && {1'b0, vaddr} < (goose_y + GOOSE_HEIGHT) &&
                 game_start_blink) begin
                 
                 // Body (Brown)
@@ -213,7 +206,7 @@ always @(posedge clk) begin
 
             // Layer 2: UW emblem obstacle (shield with coat of arms) - 40×48 pixels
             if (obstacle_select[1]) begin
-                if (haddr >= obs2_x && haddr < (obs2_x + UW_WIDTH) &&
+                if ({1'b0, haddr} >= obs2_x && {1'b0, haddr} < (obs2_x + UW_WIDTH) &&
                     vaddr >= (FLOOR_Y - UW_HEIGHT) && vaddr < FLOOR_Y) begin
                     
                     // Parametric UW emblem rendering (40×48 shield)

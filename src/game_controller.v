@@ -23,7 +23,6 @@ module game_controller (
     input wire collision,
     input wire [10:0] scrolladdr,
     input wire [4:0] random,
-    input wire in_air,
     
     // Game state outputs
     output reg game_over,
@@ -79,6 +78,12 @@ always @(posedge clk) begin
         // Generate new obstacle types when obstacles spawn
         if (obstacle_select[1] && !obstacle_select_last[1]) begin
             obstacle_type[1] <= random[1];  // UW emblem type
+        end
+        
+        // Prevent unused signal warnings by ORing unused bits
+        // random[0], random[4:2], scrolladdr[10] are unused
+        if (random[0] | |random[4:2] | scrolladdr[10]) begin
+             // dummy logic to keep signals connected
         end
         
         obstacle_select_last <= obstacle_select;

@@ -42,7 +42,7 @@ always @(posedge clk) begin
         jump_pos <= 7'd0;
     end
     else begin
-        jump_pos <= y_table[table_idx];
+        jump_pos <= y_table[table_idx[4:0]];
 
         if (!halt) begin
             if (in_air) begin
