@@ -32,18 +32,15 @@ module rendering (
     input wire sys_rst
 );
 
-// Simple sprite definitions using rectangles
-// Floor position
 localparam [10:0] FLOOR_Y = 11'd240;
 
-localparam integer GOOSE_WIDTH = 16;
-localparam integer GOOSE_HEIGHT = 16;
-localparam [10:0] GOOSE_WIDTH_PX = 11'd16;
-localparam [10:0] GOOSE_HEIGHT_PX = 11'd16;
-localparam [10:0] GOOSE_X = 11'd50;
-localparam [10:0] GOOSE_Y_BASE = FLOOR_Y - GOOSE_HEIGHT_PX;  // Ground level position (bottom of goose aligns with floor)
+localparam integer GOOSE_ROM_WIDTH = 16;
+localparam integer GOOSE_ROM_HEIGHT = 16;
+localparam [10:0] GOOSE_WIDTH_PX = 11'd32;
+localparam [10:0] GOOSE_HEIGHT_PX = 11'd32;
+localparam [10:0] GOOSE_X = 11'd64;
+localparam [10:0] GOOSE_Y_BASE = FLOOR_Y - GOOSE_HEIGHT_PX;
 
-// UW emblem obstacle: 40x48 pixels (shield with coat of arms)
 localparam integer UW_WIDTH = 40;
 localparam integer UW_HEIGHT = 48;
 localparam [10:0] UW_WIDTH_PX = 11'd40;
@@ -52,16 +49,13 @@ localparam [10:0] OBSTACLE_TOP = FLOOR_Y - UW_HEIGHT_PX;
 localparam [10:0] SCREEN_WIDTH = 11'd640;
 localparam [10:0] OBSTACLE_OFFSET = 11'd250;
 
-// Layer outputs (priority order: goose, obstacle, floor, sky)
 localparam integer LAYER_GOOSE = 0;
 localparam integer LAYER_OBSTACLE = 1;
 localparam integer LAYER_FLOOR = 2;
 localparam integer LAYER_SKY = 3;
 reg [3:0] layers;
 
-// Goose per-pixel colors (for shading)
 reg [1:0] goose_r, goose_g, goose_b;
-// Emblem per-pixel colors
 reg [1:0] emblem_r, emblem_g, emblem_b;
 
 localparam integer COLOR_BITS = 3;
@@ -73,16 +67,15 @@ localparam [COLOR_BITS-1:0] COLOR_GOLD = 3'd4;
 localparam [COLOR_BITS-1:0] COLOR_WHITE = 3'd5;
 localparam [COLOR_BITS-1:0] COLOR_RED = 3'd6;
 
-reg [COLOR_BITS*GOOSE_WIDTH-1:0] goose_rom [0:GOOSE_HEIGHT-1];
-reg [COLOR_BITS*UW_WIDTH-1:0] uw_rom [0:UW_HEIGHT-1];
+reg [COLOR_BITS*GOOSE_ROM_WIDTH-1:0] goose_rom [0:GOOSE_ROM_HEIGHT-1];
 
 function [5:0] palette;
     input [COLOR_BITS-1:0] idx;
     begin
         case (idx)
-            COLOR_GOOSE_BODY: palette = {2'b10, 2'b10, 2'b01};  // Brown
+            COLOR_GOOSE_BODY: palette = {2'b10, 2'b10, 2'b01};
             COLOR_BLACK:      palette = {2'b00, 2'b00, 2'b00};
-            COLOR_BEAK:       palette = {2'b11, 2'b10, 2'b01};  // Orange
+            COLOR_BEAK:       palette = {2'b11, 2'b10, 2'b01};
             COLOR_GOLD:       palette = {2'b11, 2'b10, 2'b00};
             COLOR_WHITE:      palette = {2'b11, 2'b11, 2'b11};
             COLOR_RED:        palette = {2'b10, 2'b00, 2'b00};
@@ -92,7 +85,7 @@ function [5:0] palette;
 endfunction
 
 function [COLOR_BITS-1:0] goose_pixel_from_row;
-    input [COLOR_BITS*GOOSE_WIDTH-1:0] row_bits;
+    input [COLOR_BITS*GOOSE_ROM_WIDTH-1:0] row_bits;
     input [3:0] px;
     integer shift;
     integer msb;
@@ -100,27 +93,12 @@ function [COLOR_BITS-1:0] goose_pixel_from_row;
     begin
         px_int = {{(32-4){1'b0}}, px};
         shift = px_int * COLOR_BITS;
-        msb = (GOOSE_WIDTH*COLOR_BITS - 1) - shift;
+        msb = (GOOSE_ROM_WIDTH*COLOR_BITS - 1) - shift;
         goose_pixel_from_row = row_bits[msb -: COLOR_BITS];
     end
 endfunction
 
-function [COLOR_BITS-1:0] uw_pixel_from_row;
-    input [COLOR_BITS*UW_WIDTH-1:0] row_bits;
-    input [5:0] px;
-    integer shift;
-    integer msb;
-    integer px_int;
-    begin
-        px_int = {{(32-6){1'b0}}, px};
-        shift = px_int * COLOR_BITS;
-        msb = (UW_WIDTH*COLOR_BITS - 1) - shift;
-        uw_pixel_from_row = row_bits[msb -: COLOR_BITS];
-    end
-endfunction
-
 initial begin
-    // Goose sprite ROM (16x16, 3 bits per pixel)
     goose_rom[0]  = 48'b000000000000000000000000000000000000000000000000;
     goose_rom[1]  = 48'b000000000000000000000000000000000000000000000000;
     goose_rom[2]  = 48'b000000000000000000000000000000010010010010010000;
@@ -137,77 +115,25 @@ initial begin
     goose_rom[13] = 48'b000000001001001001001001001001001001001000000000;
     goose_rom[14] = 48'b000000001001001001001001001001001001001000000000;
     goose_rom[15] = 48'b000000000000010010000000000010010000000000000000;
-
-    // UW emblem ROM (40x48, 3 bits per pixel)
-    uw_rom[0]  = 120'b010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010;
-    uw_rom[1]  = 120'b010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010010;
-    uw_rom[2]  = 120'b010101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101101010;
-    uw_rom[3]  = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
-    uw_rom[4]  = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
-    uw_rom[5]  = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
-    uw_rom[6]  = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
-    uw_rom[7]  = 120'b010101100100100100100100100100100100110110110100100100100100100100100100100100110110110100100100100100100100100100101010;
-    uw_rom[8]  = 120'b010101100100100100100100110110110110110110110100100100100100100100100100100100110110110110110110110100100100100100101010;
-    uw_rom[9]  = 120'b010101100100100100100100110110110110110110110110100100100100100100100100100110110110110110110110110100100100100100101010;
-    uw_rom[10] = 120'b010101100100100100100100110110110110110110110110100100100100100100100100100110110110110110110110110100100100100100101010;
-    uw_rom[11] = 120'b010101100100100100100100110110110110110110100100100100100100100100100100100100100110110110110110110100100100100100101010;
-    uw_rom[12] = 120'b010101100100100100100100110110110110110110100100100010010010010010010010100100100110110110110110110100100100100100101010;
-    uw_rom[13] = 120'b010101100100100100100100110110110110110110100100010010010010100010010010010100100110110110110110110100100100100100101010;
-    uw_rom[14] = 120'b010101100100100100100100100100100100100100100010010101101101100101101101010010100100100100100100100100100100100100101010;
-    uw_rom[15] = 120'b010101100100100100100100100100100100100100010010101101101100100100101101101010010100100100100100100100100100100100101010;
-    uw_rom[16] = 120'b010101100100100100100100100100100100100010010101101101100100100100100101101101010010100100100100100100100100100100101010;
-    uw_rom[17] = 120'b010101100100100100100100100100100100010010101101101100100100100100100100101101101010010100100100100100100100100100101010;
-    uw_rom[18] = 120'b010101100100100100100100100100100010010101101101100100100100100100100100100101101101010010100100100100100100100100101010;
-    uw_rom[19] = 120'b010101100100100100100100100100010010101101101100100100100100100100100100100100101101101010010100100100100100100100101010;
-    uw_rom[20] = 120'b010101100100100100100100100010010101101101100100100100100100100100100100100100100101101101010010100100100100100100101010;
-    uw_rom[21] = 120'b010101100100100100100100010010101101101100100100100100100100100100100100100100100100101101101010010100100100100100101010;
-    uw_rom[22] = 120'b010101100100100100100010010101101101100100100100100100100100100100100100100100100100100101101101010010100100100100101010;
-    uw_rom[23] = 120'b010101100100100100010010101101101100100100100100100100100100100100100100100100100100100100101101101010010100100100101010;
-    uw_rom[24] = 120'b010101100100100010010010010100100100100100100100100100100100100100100100100100100100100100100100010010010010100100101010;
-    uw_rom[25] = 120'b010101100100010010010010100100100100100100100100100100100100100100100100100100100100100100100100100010010010010100101010;
-    uw_rom[26] = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
-    uw_rom[27] = 120'b010101100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100100101010;
-    uw_rom[28] = 120'b010101100100100100100100100100100100100100100100100100110110110110110100100100100100100100100100100100100100100100101010;
-    uw_rom[29] = 120'b010101100100100100100100100100100100100100100100100100110110110110110100100100100100100100100100100100100100100100101010;
-    uw_rom[30] = 120'b010101100100100100100100100100100100100100100100110110110110110110110110110100100100100100100100100100100100100100101010;
-    uw_rom[31] = 120'b000010101100100100100100100100100100100100100100110110110110110110110110110100100100100100100100100100100100100101010000;
-    uw_rom[32] = 120'b000000010101100100100100100100100100100100100110110110110110110110110110110110100100100100100100100100100100101010000000;
-    uw_rom[33] = 120'b000000000010101100100100100100100100100100100110110110110110110110110110110110100100100100100100100100100101010000000000;
-    uw_rom[34] = 120'b000000000000010101100100100100100100100100100100110110110110110110110110110100100100100100100100100100101010000000000000;
-    uw_rom[35] = 120'b000000000000000010101100100100100100100100100100110110110110110110110110110100100100100100100100100101010000000000000000;
-    uw_rom[36] = 120'b000000000000000000010101100100100100100100100100110110110110110110110110110100100100100100100100101010000000000000000000;
-    uw_rom[37] = 120'b000000000000000000000010101100100100100100100100110110110110110110110110110100100100100100100101010000000000000000000000;
-    uw_rom[38] = 120'b000000000000000000000000010101100100100100100100100100100100100100100100100100100100100100101010000000000000000000000000;
-    uw_rom[39] = 120'b000000000000000000000000000010101100100100100100100100100100100100100100100100100100100101010000000000000000000000000000;
-    uw_rom[40] = 120'b000000000000000000000000000000010101100100100100100100100100100100100100100100100100101010000000000000000000000000000000;
-    uw_rom[41] = 120'b000000000000000000000000000000000010101100100100100100100100100100100100100100100101010000000000000000000000000000000000;
-    uw_rom[42] = 120'b000000000000000000000000000000000000010101100100100100100100100100100100100100101010000000000000000000000000000000000000;
-    uw_rom[43] = 120'b000000000000000000000000000000000000000010101100100100100100100100100100100101010000000000000000000000000000000000000000;
-    uw_rom[44] = 120'b000000000000000000000000000000000000000000010101100100100100100100100100101010000000000000000000000000000000000000000000;
-    uw_rom[45] = 120'b000000000000000000000000000000000000000000000010101100100100100100100101010000000000000000000000000000000000000000000000;
-    uw_rom[46] = 120'b000000000000000000000000000000000000000000000000000000000010010000000000000000000000000000000000000000000000000000000000;
-    uw_rom[47] = 120'b000000000000000000000000000000000000000000000000000000000010010000000000000000000000000000000000000000000000000000000000;
 end
 
-// Collision: goose hits UW emblem
 assign collision = layers[LAYER_GOOSE] & layers[LAYER_OBSTACLE];
 
-// Composite all layers with colors (priority order: goose, obstacles, floor, sky)
 wire [1:0] final_r, final_g, final_b;
-assign final_r = (layers[LAYER_GOOSE] ? goose_r :        // Goose (with shading)
-                  layers[LAYER_OBSTACLE] ? emblem_r :    // UW emblem (with colors)
-                  layers[LAYER_FLOOR] ? 2'b01 :          // Floor: R=01
-                  layers[LAYER_SKY] ? 2'b00 : 2'b00);    // Sky: R=00
+assign final_r = (layers[LAYER_GOOSE] ? goose_r :
+                  layers[LAYER_OBSTACLE] ? emblem_r :
+                  layers[LAYER_FLOOR] ? 2'b01 :
+                  layers[LAYER_SKY] ? 2'b00 : 2'b00);
 
-assign final_g = (layers[LAYER_GOOSE] ? goose_g :        // Goose (with shading)
-                  layers[LAYER_OBSTACLE] ? emblem_g :    // UW emblem (with colors)
-                  layers[LAYER_FLOOR] ? 2'b01 :          // Floor: G=01
-                  layers[LAYER_SKY] ? 2'b11 : 2'b00);    // Sky: G=11
+assign final_g = (layers[LAYER_GOOSE] ? goose_g :
+                  layers[LAYER_OBSTACLE] ? emblem_g :
+                  layers[LAYER_FLOOR] ? 2'b01 :
+                  layers[LAYER_SKY] ? 2'b11 : 2'b00);
 
-assign final_b = (layers[LAYER_GOOSE] ? goose_b :        // Goose (with shading)
-                  layers[LAYER_OBSTACLE] ? emblem_b :    // UW emblem (with colors)
-                  layers[LAYER_FLOOR] ? 2'b01 :          // Floor: B=01
-                  layers[LAYER_SKY] ? 2'b11 : 2'b00);    // Sky: B=11
+assign final_b = (layers[LAYER_GOOSE] ? goose_b :
+                  layers[LAYER_OBSTACLE] ? emblem_b :
+                  layers[LAYER_FLOOR] ? 2'b01 :
+                  layers[LAYER_SKY] ? 2'b11 : 2'b00);
 
 assign R = display_on ? final_r : 2'b00;
 assign G = display_on ? final_g : 2'b00;
@@ -217,16 +143,17 @@ wire [10:0] vaddr_ext = {1'b0, vaddr};
 wire [10:0] haddr_ext = {1'b0, haddr};
 
 wire [10:0] goose_y = GOOSE_Y_BASE - {4'd0, jump_pos};
-wire [10:0] goose_right = GOOSE_X + GOOSE_WIDTH_PX;
-wire goose_in_bounds = (haddr_ext >= GOOSE_X) && (haddr_ext < goose_right) &&
+wire goose_x_in_bounds = (haddr_ext[10:5] == 6'b000010);
+wire goose_in_bounds = goose_x_in_bounds &&
                        (vaddr_ext >= goose_y) && (vaddr_ext < (goose_y + GOOSE_HEIGHT_PX));
 wire goose_active = goose_in_bounds && game_start_blink && display_on;
-wire [3:0] goose_x_offset = haddr_ext[3:0] - GOOSE_X[3:0];
-wire [3:0] goose_y_offset = vaddr_ext[3:0] - goose_y[3:0];
-wire [3:0] goose_local_x = goose_in_bounds ? goose_x_offset : 4'd0;
-wire [3:0] goose_local_y = goose_in_bounds ? goose_y_offset : 4'd0;
-wire [COLOR_BITS*GOOSE_WIDTH-1:0] goose_row_bits = goose_rom[goose_local_y];
-wire [COLOR_BITS-1:0] goose_pixel_raw = goose_pixel_from_row(goose_row_bits, goose_local_x);
+
+wire [10:0] goose_diff_y_full = vaddr_ext - goose_y;
+wire [3:0] goose_rom_x = haddr_ext[4:1];
+wire [3:0] goose_rom_y = goose_diff_y_full[4:1];
+
+wire [COLOR_BITS*GOOSE_ROM_WIDTH-1:0] goose_row_bits = goose_rom[goose_rom_y];
+wire [COLOR_BITS-1:0] goose_pixel_raw = goose_pixel_from_row(goose_row_bits, goose_rom_x);
 wire [COLOR_BITS-1:0] goose_pixel_idx = goose_active ? goose_pixel_raw : COLOR_TRANSPARENT;
 wire [COLOR_BITS-1:0] goose_color_idx =
     (game_over && goose_pixel_idx != COLOR_TRANSPARENT) ? COLOR_RED : goose_pixel_idx;
@@ -237,14 +164,10 @@ wire [10:0] obstacle_right = obs2_x + UW_WIDTH_PX;
 wire obstacle_in_bounds = obstacle_active && display_on &&
                           (haddr_ext >= obs2_x) && (haddr_ext < obstacle_right) &&
                           (vaddr_ext >= OBSTACLE_TOP) && (vaddr_ext < FLOOR_Y);
-wire [5:0] emblem_x_offset = haddr_ext[5:0] - obs2_x[5:0];
-wire [5:0] emblem_y_offset = vaddr_ext[5:0] - OBSTACLE_TOP[5:0];
-wire [5:0] emblem_local_x = obstacle_in_bounds ? emblem_x_offset : 6'd0;
-wire [5:0] emblem_local_y = obstacle_in_bounds ? emblem_y_offset : 6'd0;
-wire [COLOR_BITS*UW_WIDTH-1:0] emblem_row_bits = uw_rom[emblem_local_y];
-wire [COLOR_BITS-1:0] emblem_pixel_raw = uw_pixel_from_row(emblem_row_bits, emblem_local_x);
-wire [COLOR_BITS-1:0] emblem_pixel_idx = obstacle_in_bounds ? emblem_pixel_raw : COLOR_TRANSPARENT;
-wire [5:0] emblem_rgb = palette(emblem_pixel_idx);
+
+wire [5:0] emblem_local_x = obstacle_in_bounds ? (haddr_ext[5:0] - obs2_x[5:0]) : 6'd0;
+wire [5:0] emblem_local_y = obstacle_in_bounds ? (vaddr_ext[5:0] - OBSTACLE_TOP[5:0]) : 6'd0;
+
 
 always @(posedge clk) begin
     if (sys_rst) begin
@@ -278,15 +201,115 @@ always @(posedge clk) begin
                 {goose_r, goose_g, goose_b} <= goose_rgb;
             end
 
-            if (emblem_pixel_idx != COLOR_TRANSPARENT) begin
+            if (obstacle_active) begin
+                if (obstacle_in_bounds) begin
+                    if (((emblem_local_y >= 7 && emblem_local_y <= 13) && 
+                         (emblem_local_x >= 7 && emblem_local_x <= 15)) &&
+                        (((emblem_local_y >= 8 && emblem_local_y <= 13) && (emblem_local_x >= 8 && emblem_local_x <= 13)) ||
+                         ((emblem_local_y >= 7 && emblem_local_y <= 9) && (emblem_local_x >= 12 && emblem_local_x <= 14)) ||
+                         ((emblem_local_y >= 9 && emblem_local_y <= 10) && (emblem_local_x >= 14 && emblem_local_x <= 15)))) begin
                         layers[LAYER_OBSTACLE] <= 1'b1;
-                {emblem_r, emblem_g, emblem_b} <= emblem_rgb;
+                        emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                    end
+                    else if (((emblem_local_y >= 7 && emblem_local_y <= 13) && 
+                              (emblem_local_x >= 25 && emblem_local_x <= 33)) &&
+                             (((emblem_local_y >= 8 && emblem_local_y <= 13) && (emblem_local_x >= 27 && emblem_local_x <= 32)) ||
+                              ((emblem_local_y >= 7 && emblem_local_y <= 9) && (emblem_local_x >= 26 && emblem_local_x <= 28)) ||
+                              ((emblem_local_y >= 9 && emblem_local_y <= 10) && (emblem_local_x >= 25 && emblem_local_x <= 26)))) begin
+                        layers[LAYER_OBSTACLE] <= 1'b1;
+                        emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                    end
+                    else if (((emblem_local_y >= 28 && emblem_local_y <= 37) && 
+                              (emblem_local_x >= 15 && emblem_local_x <= 25)) &&
+                             (((emblem_local_y >= 30 && emblem_local_y <= 37) && (emblem_local_x >= 16 && emblem_local_x <= 24)) ||
+                              ((emblem_local_y >= 28 && emblem_local_y <= 31) && (emblem_local_x >= 18 && emblem_local_x <= 22)) ||
+                              ((emblem_local_y >= 32 && emblem_local_y <= 33) && 
+                               ((emblem_local_x >= 15 && emblem_local_x <= 16) || (emblem_local_x >= 24 && emblem_local_x <= 25))))) begin
+                        layers[LAYER_OBSTACLE] <= 1'b1;
+                        emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                    end
+                    else if (((emblem_local_y >= 14 && emblem_local_y <= 23)) &&
+                             (((emblem_local_x >= (8 + (23 - emblem_local_y))) && 
+                               (emblem_local_x <= (10 + (23 - emblem_local_y)))) ||
+                              ((emblem_local_x >= (30 - (23 - emblem_local_y))) && 
+                               (emblem_local_x <= (32 - (23 - emblem_local_y)))))) begin
+                        layers[LAYER_OBSTACLE] <= 1'b1;
+                        emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11;
+                    end
+                    else if (((emblem_local_y >= 12 && emblem_local_y <= 25)) &&
+                             (((emblem_local_x >= (5 + (24 - emblem_local_y))) && 
+                               (emblem_local_x <= (8 + (24 - emblem_local_y)))) ||
+                              ((emblem_local_x >= (32 - (24 - emblem_local_y))) && 
+                               (emblem_local_x <= (35 - (24 - emblem_local_y)))))) begin
+                        layers[LAYER_OBSTACLE] <= 1'b1;
+                        emblem_r <= 2'b00; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                    end
+                    else if (
+                        ((emblem_local_y == 2) && 
+                         (emblem_local_x >= 1 && emblem_local_x <= 38)) ||
+                        ((emblem_local_y >= 3 && emblem_local_y <= 15) && 
+                         ((emblem_local_x == 1) || (emblem_local_x == 38))) ||
+                        ((emblem_local_y >= 16 && emblem_local_y <= 30) && 
+                         ((emblem_local_x == 1) || (emblem_local_x == 38))) ||
+                        ((emblem_local_y >= 31 && emblem_local_y <= 35) && 
+                         ((emblem_local_x == (1 + (emblem_local_y - 30))) || 
+                          (emblem_local_x == (38 - (emblem_local_y - 30))))) ||
+                        ((emblem_local_y >= 36 && emblem_local_y <= 42) && 
+                         ((emblem_local_x == (6 + (emblem_local_y - 35))) || 
+                          (emblem_local_x == (33 - (emblem_local_y - 35))))) ||
+                        ((emblem_local_y >= 43 && emblem_local_y <= 45) && 
+                         ((emblem_local_x == (14 + (emblem_local_y - 43))) || 
+                          (emblem_local_x == (25 - (emblem_local_y - 43)))))
+                    ) begin
+                        layers[LAYER_OBSTACLE] <= 1'b1;
+                        emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11;
+                    end
+                    else if (
+                        ((emblem_local_y >= 3 && emblem_local_y <= 15) && 
+                         (emblem_local_x >= 2 && emblem_local_x <= 37)) ||
+                        ((emblem_local_y >= 16 && emblem_local_y <= 30) && 
+                         (emblem_local_x >= 2 && emblem_local_x <= 37)) ||
+                        ((emblem_local_y >= 31 && emblem_local_y <= 35) && 
+                         (emblem_local_x >= (2 + (emblem_local_y - 30)) && 
+                          emblem_local_x <= (37 - (emblem_local_y - 30)))) ||
+                        ((emblem_local_y >= 36 && emblem_local_y <= 42) && 
+                         (emblem_local_x >= (7 + (emblem_local_y - 35)) && 
+                          emblem_local_x <= (32 - (emblem_local_y - 35)))) ||
+                        ((emblem_local_y >= 43 && emblem_local_y <= 45) && 
+                         (emblem_local_x >= (15 + (emblem_local_y - 43)) && 
+                          emblem_local_x <= (24 - (emblem_local_y - 43))))
+                    ) begin
+                        layers[LAYER_OBSTACLE] <= 1'b1;
+                        emblem_r <= 2'b11; emblem_g <= 2'b10; emblem_b <= 2'b00;
+                    end
+                    else if (
+                        ((emblem_local_y <= 1) && 
+                         (emblem_local_x >= 2 && emblem_local_x <= 37)) ||
+                        ((emblem_local_y <= 1) && 
+                         ((emblem_local_x <= 1) || (emblem_local_x >= 38))) ||
+                        ((emblem_local_y >= 2 && emblem_local_y <= 15) && 
+                         ((emblem_local_x == 0) || (emblem_local_x == 39))) ||
+                        ((emblem_local_y >= 16 && emblem_local_y <= 30) && 
+                         ((emblem_local_x == 0) || (emblem_local_x == 39))) ||
+                        ((emblem_local_y >= 31 && emblem_local_y <= 35) && 
+                         ((emblem_local_x == (emblem_local_y - 30)) || 
+                          (emblem_local_x == (39 - (emblem_local_y - 30))))) ||
+                        ((emblem_local_y >= 36 && emblem_local_y <= 42) && 
+                         ((emblem_local_x == (5 + (emblem_local_y - 35))) || 
+                          (emblem_local_x == (34 - (emblem_local_y - 35))))) ||
+                        ((emblem_local_y >= 43 && emblem_local_y <= 45) && 
+                         ((emblem_local_x == (13 + (emblem_local_y - 43))) || 
+                          (emblem_local_x == (26 - (emblem_local_y - 43))))) ||
+                        ((emblem_local_y >= 46 && emblem_local_y <= 47) && 
+                         ((emblem_local_x == 19) || (emblem_local_x == 20)))
+                    ) begin
+                        layers[LAYER_OBSTACLE] <= 1'b1;
+                        emblem_r <= 2'b00; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                    end
+                end
             end
         end
     end
 end
 
 endmodule
-
-
-
