@@ -71,34 +71,31 @@ end
 // This gives smooth up-and-down motion with half the ROM
 initial begin
     y_table[0]  = 7'd0;   // Ground level
-    y_table[1]  = 7'd6;
-    y_table[2]  = 7'd12;
-    y_table[3]  = 7'd18;
-    y_table[4]  = 7'd23;
-    y_table[5]  = 7'd28;
-    y_table[6]  = 7'd33;
-    y_table[7]  = 7'd38;
-    y_table[8]  = 7'd43;
-    y_table[9]  = 7'd47;
-    y_table[10] = 7'd51;
-    y_table[11] = 7'd54;
-    y_table[12] = 7'd58;
-    y_table[13] = 7'd61;
-    y_table[14] = 7'd64;
-    y_table[15] = 7'd67;
-    y_table[16] = 7'd69;
-    y_table[17] = 7'd71;
-    y_table[18] = 7'd73;
-    y_table[19] = 7'd75;
-    y_table[20] = 7'd76;
-    y_table[21] = 7'd77;
-    y_table[22] = 7'd78;
-    y_table[23] = 7'd79;
-    y_table[24] = 7'd79;
-    y_table[25] = 7'd80;  // Peak of jump
-    
-    // Descent automatically mirrors ascent via table_idx calculation
-    // Saves 25 entries × 7 bits = 175 bits of ROM vs original
+    y_table[1]  = 7'd8;
+    y_table[2]  = 7'd16;
+    y_table[3]  = 7'd23;
+    y_table[4]  = 7'd30;
+    y_table[5]  = 7'd36;
+    y_table[6]  = 7'd43;
+    y_table[7]  = 7'd49;
+    y_table[8]  = 7'd56;
+    y_table[9]  = 7'd61;
+    y_table[10] = 7'd66;
+    y_table[11] = 7'd70;
+    y_table[12] = 7'd75;
+    y_table[13] = 7'd79;
+    y_table[14] = 7'd83;
+    y_table[15] = 7'd87;
+    y_table[16] = 7'd90;
+    y_table[17] = 7'd92;
+    y_table[18] = 7'd95;
+    y_table[19] = 7'd98;
+    y_table[20] = 7'd99;
+    y_table[21] = 7'd100;
+    y_table[22] = 7'd101;
+    y_table[23] = 7'd103;
+    y_table[24] = 7'd103;
+    y_table[25] = 7'd104;  // Peak of jump
 end
 
 endmodule
