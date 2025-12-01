@@ -53,7 +53,8 @@ localparam integer LAYER_GOOSE = 0;
 localparam integer LAYER_OBSTACLE = 1;
 localparam integer LAYER_FLOOR = 2;
 localparam integer LAYER_SKY = 3;
-reg [3:0] layers;
+localparam integer LAYER_FLOOR_DOTS = 4;
+reg [4:0] layers;
 
 reg [1:0] goose_r, goose_g, goose_b;
 reg [1:0] emblem_r, emblem_g, emblem_b;
@@ -122,16 +123,19 @@ assign collision = layers[LAYER_GOOSE] & layers[LAYER_OBSTACLE];
 wire [1:0] final_r, final_g, final_b;
 assign final_r = (layers[LAYER_GOOSE] ? goose_r :
                   layers[LAYER_OBSTACLE] ? emblem_r :
+                  layers[LAYER_FLOOR_DOTS] ? 2'b10 :
                   layers[LAYER_FLOOR] ? 2'b01 :
                   layers[LAYER_SKY] ? 2'b00 : 2'b00);
 
 assign final_g = (layers[LAYER_GOOSE] ? goose_g :
                   layers[LAYER_OBSTACLE] ? emblem_g :
+                  layers[LAYER_FLOOR_DOTS] ? 2'b10 :
                   layers[LAYER_FLOOR] ? 2'b01 :
                   layers[LAYER_SKY] ? 2'b11 : 2'b00);
 
 assign final_b = (layers[LAYER_GOOSE] ? goose_b :
                   layers[LAYER_OBSTACLE] ? emblem_b :
+                  layers[LAYER_FLOOR_DOTS] ? 2'b10 :
                   layers[LAYER_FLOOR] ? 2'b01 :
                   layers[LAYER_SKY] ? 2'b11 : 2'b00);
 
@@ -168,10 +172,12 @@ wire obstacle_in_bounds = obstacle_active && display_on &&
 wire [5:0] emblem_local_x = obstacle_in_bounds ? (haddr_ext[5:0] - obs2_x[5:0]) : 6'd0;
 wire [5:0] emblem_local_y = obstacle_in_bounds ? (vaddr_ext[5:0] - OBSTACLE_TOP[5:0]) : 6'd0;
 
+// Floor dots scrolling position
+wire [10:0] floor_scroll_pos = haddr_ext + scrolladdr;
 
 always @(posedge clk) begin
     if (sys_rst) begin
-        layers <= 4'd0;
+        layers <= 5'd0;
         goose_r <= 2'b00;
         goose_g <= 2'b00;
         goose_b <= 2'b00;
@@ -180,7 +186,7 @@ always @(posedge clk) begin
         emblem_b <= 2'b00;
     end
     else begin
-        layers <= 4'd0;
+        layers <= 5'd0;
         goose_r <= 2'b00;
         goose_g <= 2'b00;
         goose_b <= 2'b00;
@@ -194,6 +200,14 @@ always @(posedge clk) begin
             end
             else begin
                 layers[LAYER_FLOOR] <= 1'b1;
+                // Add dotted texture at top of floor (1 pixel high) that scrolls
+                if (vaddr_ext == FLOOR_Y) begin
+                    // Create dots every 16 pixels that scroll with the game
+                    if (floor_scroll_pos[3:0] >= 4'd2 && 
+                        floor_scroll_pos[3:0] <= 4'd5) begin
+                        layers[LAYER_FLOOR_DOTS] <= 1'b1;
+                    end
+                end
             end
             
             if (goose_pixel_idx != COLOR_TRANSPARENT) begin

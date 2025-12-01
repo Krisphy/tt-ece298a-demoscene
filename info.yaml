@@ -29,7 +29,7 @@ project:
 pinout:
   # Inputs
   ui[0]: "bt1"
-  ui[1]: "rst" # right now this is a halt button, need to update functionality to be a reset
+  ui[1]: "rst" # reset button - resets the game
   ui[2]: ""
   ui[3]: ""
   ui[4]: ""

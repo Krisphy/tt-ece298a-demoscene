@@ -43,7 +43,7 @@ module tt_um_goose_game(
   // ============================================================================
   
   wire jump_button = ui_in[0];
-  wire halt_button = ui_in[1];
+  wire reset_button = ui_in[1];
 
   // ============================================================================
   // Inter-Module Signals
@@ -102,7 +102,7 @@ module tt_um_goose_game(
     .clk(clk),
     .rst_n(rst_n),
     .jump_button(jump_button),
-    .halt_button(halt_button),
+    .reset_button(reset_button),
     .collision(collision),
     .scrolladdr(scrolladdr[9:0]),
     .game_over(game_over),

@@ -36,9 +36,9 @@ async def test_project(dut):
     dut.ui_in.value = 0b00000001  # Jump button pressed
     await ClockCycles(dut.clk, 100)
     
-    # Test halt button
-    dut._log.info("Testing halt button input")
-    dut.ui_in.value = 0b00000010  # Halt button pressed
+    # Test reset button
+    dut._log.info("Testing reset button input")
+    dut.ui_in.value = 0b00000010  # Reset button pressed
     await ClockCycles(dut.clk, 100)
     
     # Both buttons released

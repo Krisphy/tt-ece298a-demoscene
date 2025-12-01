@@ -16,7 +16,7 @@ module game_controller (
     
     // User inputs
     input wire jump_button,
-    input wire halt_button,
+    input wire reset_button,
     
     // Inputs from other modules
     input wire collision,
@@ -39,10 +39,13 @@ module game_controller (
 localparam START_TIME = 30000000;  // ~1.2 seconds at 25MHz
 
 reg [24:0] start_ctr;
-reg [19:0] no_jump_ctr;
+reg reset_button_prev;
 
-assign game_reset = game_over & jump_button & (no_jump_ctr > 20'd100000);
-assign game_halt = game_over || halt_button || (start_ctr < START_TIME);
+// Reset button edge detection - trigger on rising edge
+wire reset_button_pressed = reset_button && !reset_button_prev;
+
+assign game_reset = reset_button_pressed;
+assign game_halt = game_over || (start_ctr < START_TIME);
 assign game_start_blink = (start_ctr >= START_TIME) || start_ctr[22] || game_over;
 
 // ============================================================================
@@ -76,34 +79,24 @@ always @(posedge clk) begin
     if (!rst_n) begin
         game_over <= 1'b0;
         start_ctr <= 25'd0;
-        no_jump_ctr <= 20'd0;
-        // game_running <= 1'b0;
+        reset_button_prev <= 1'b0;
     end
     else begin
+        // Track reset button for edge detection
+        reset_button_prev <= reset_button;
+        
         // Start counter for initial delay
         if (start_ctr < START_TIME) begin
             start_ctr <= start_ctr + 25'd1;
         end
 
-        // Game running state - Logic removed as output is unused
-        // game_running <= (start_ctr >= START_TIME) && !game_over;
-
-        // Track jump button for reset detection
-        if (jump_button) begin
-            no_jump_ctr <= 20'd0;
-        end
-        else if (no_jump_ctr < 20'd1000000) begin
-            no_jump_ctr <= no_jump_ctr + 20'd1;
-        end
-
-        // Game reset
+        // Game reset - restart the game
         if (game_reset) begin
             game_over <= 1'b0;
             start_ctr <= START_TIME;  // Skip startup delay on reset
         end
-
         // Collision detection
-        if (collision && !game_over) begin
+        else if (collision && !game_over) begin
             game_over <= 1'b1;
         end
     end

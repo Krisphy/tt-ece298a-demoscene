@@ -67,5 +67,5 @@ make run-audiotest-wav     # Build and run audiotest-wav
 
 **All game builds:**
 - `SPACE` or `↑` = Jump
-- `H` = Halt/Pause
+- `R` = Reset
 - `ESC` = Quit
