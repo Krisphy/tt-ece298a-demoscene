@@ -54,7 +54,7 @@ module tt_um_goose_game(
   wire game_reset;
   wire game_halt;
   wire game_start_blink;
-  wire obstacle_active;
+  wire [2:0] obstacle_active;  // 3 obstacles can be active simultaneously
   
   // From jumping
   wire [6:0] jump_pos;

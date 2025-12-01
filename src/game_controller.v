@@ -28,8 +28,8 @@ module game_controller (
     output wire game_halt,
     output wire game_start_blink,
     
-    // Obstacle state outputs
-    output reg obstacle_active
+    // Obstacle state outputs - now support 3 obstacles
+    output reg [2:0] obstacle_active
 );
 
 // ============================================================================
@@ -55,18 +55,41 @@ assign game_start_blink = (start_ctr >= START_TIME) || start_ctr[22] || game_ove
 // Obstacle dimensions (must match rendering.v)
 localparam UW_WIDTH = 40;
 
+// Multiple obstacles can be active at once
+// Obstacle spawn positions are staggered to create continuous challenges
+// Obstacles move RIGHT to LEFT (start at right edge, exit left)
 always @(posedge clk) begin
     if (!rst_n) begin
-        obstacle_active <= 1'b0;
+        obstacle_active <= 3'b000;
     end
     else begin
-        // Obstacle 1: UW emblem (spawns at 250 offset)
-        // We use only scrolladdr[9:0]
-        if (scrolladdr[9:0] >= 10'd250 && scrolladdr[9:0] < 10'd260) begin
-            obstacle_active <= 1'b1;
+        // Obstacle 0: spawns at scrolladdr 0-10, at position 640-scrolladdr
+        // Deactivates when completely off left: scrolladdr > 680 (640 + 40)
+        if (scrolladdr[9:0] >= 10'd0 && scrolladdr[9:0] < 10'd10) begin
+            obstacle_active[0] <= 1'b1;
         end
-        else if (scrolladdr[9:0] > (10'd640 + 10'd250 + UW_WIDTH)) begin
-            obstacle_active <= 1'b0;
+        else if (scrolladdr[9:0] > 10'd680) begin
+            obstacle_active[0] <= 1'b0;
+        end
+        
+        // Obstacle 1: spawns at scrolladdr 200-210, at position 640-scrolladdr+200
+        // Deactivates when completely off left: scrolladdr > 880 (640 + 200 + 40)
+        if (scrolladdr[9:0] >= 10'd200 && scrolladdr[9:0] < 10'd210) begin
+            obstacle_active[1] <= 1'b1;
+        end
+        else if (scrolladdr[9:0] > 10'd880) begin
+            obstacle_active[1] <= 1'b0;
+        end
+        
+        // Obstacle 2: spawns at scrolladdr 400-410, at position 640-scrolladdr+400
+        // Deactivates when completely off left: scrolladdr > 1080
+        // Since 1080 > 1023 (10-bit max), it wraps to 56 (1080 - 1024 = 56)
+        if (scrolladdr[9:0] >= 10'd400 && scrolladdr[9:0] < 10'd410) begin
+            obstacle_active[2] <= 1'b1;
+        end
+        else if (scrolladdr[9:0] > 10'd56 && scrolladdr[9:0] < 10'd400) begin
+            // Deactivate when scrolladdr wrapped past 1024 and is now > 56
+            obstacle_active[2] <= 1'b0;
         end
     end
 end
