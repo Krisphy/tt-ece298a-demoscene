@@ -1,66 +1,44 @@
-# Verilator Build Targets
+# Verilator Simulation
 
-## Goose Game Targets
+This directory contains a Verilator-based simulation environment for the Goose Game that displays the VGA output using SDL2.
 
-### `make goosegame`
-Builds the game **without audio**.
-- No audio processing
-- Good for testing game logic and visuals
+## Building
+
+### Requirements
+- Verilator
+- SDL2 development libraries
+- C++ compiler (g++)
+
+### Build the simulation
 ```bash
-make goosegame
+make
+```
+
+This will:
+1. Run Verilator to generate C++ model from Verilog sources
+2. Compile the C++ testbench with SDL2
+3. Create the `goosegame` executable
+
+## Running
+
+```bash
 ./goosegame
 ```
 
-### `make goosegame-audio`
-Builds the game **with audio playback**.
-- Real-time audio playback via SDL2
+Or build and run in one step:
 ```bash
-make goosegame-audio
-./goosegame-audio
+make run
 ```
 
-## Audio Test Targets
+The simulation will open an SDL2 window displaying the VGA output at 640x480 resolution.
 
-### `make audiotest-play`
-Tests audio module with **real-time playback** via SDL2.
-- Plays audio as simulation runs
-- For interactive audio testing
-```bash
-make audiotest-play
-./audiotest-play
-```
-
-### `make audiotest-wav`
-Tests audio module and **generates WAV files**.
-- Creates separate WAV files for each sound effect
-- No real-time playback
-- For offline audio analysis
-```bash
-make audiotest-wav
-./audiotest-wav
-# Creates: audio_jump.wav, audio_death.wav, audio_highscore.wav
-```
-
-## VGA Demo Target
-
-### `make vgademo`
-Simple VGA color pattern demo (no game logic).
-```bash
-make vgademo
-./vgademo
-```
-
-## Convenience Targets
+## Make Targets
 
 ```bash
-make all            # Build all targets (default)
-make clean          # Remove all build artifacts
-
-make run            # Build and run goosegame (no audio)
-make run-audio      # Build and run goosegame-audio
-make run-demo       # Build and run vgademo
-make run-audiotest-play    # Build and run audiotest-play
-make run-audiotest-wav     # Build and run audiotest-wav
+make            # Build the goosegame executable (default)
+make all        # Same as make
+make clean      # Remove all build artifacts and generated files
+make run        # Build and run the simulation
 ```
 
 ## Controls

@@ -217,6 +217,9 @@ always @(posedge clk) begin
 
             if (obstacle_active) begin
                 if (obstacle_in_bounds) begin
+                    // === RED LIONS (on gold background) ===
+                    
+                    // Upper left lion
                     if (((emblem_local_y >= 7 && emblem_local_y <= 13) && 
                          (emblem_local_x >= 7 && emblem_local_x <= 15)) &&
                         (((emblem_local_y >= 8 && emblem_local_y <= 13) && (emblem_local_x >= 8 && emblem_local_x <= 13)) ||
@@ -225,6 +228,7 @@ always @(posedge clk) begin
                         layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
                     end
+                    // Upper right lion
                     else if (((emblem_local_y >= 7 && emblem_local_y <= 13) && 
                               (emblem_local_x >= 25 && emblem_local_x <= 33)) &&
                              (((emblem_local_y >= 8 && emblem_local_y <= 13) && (emblem_local_x >= 27 && emblem_local_x <= 32)) ||
@@ -233,6 +237,7 @@ always @(posedge clk) begin
                         layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
                     end
+                    // Lower/bottom lion
                     else if (((emblem_local_y >= 28 && emblem_local_y <= 37) && 
                               (emblem_local_x >= 15 && emblem_local_x <= 25)) &&
                              (((emblem_local_y >= 30 && emblem_local_y <= 37) && (emblem_local_x >= 16 && emblem_local_x <= 24)) ||
@@ -242,22 +247,34 @@ always @(posedge clk) begin
                         layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
                     end
-                    else if (((emblem_local_y >= 14 && emblem_local_y <= 23)) &&
-                             (((emblem_local_x >= (8 + (23 - emblem_local_y))) && 
-                               (emblem_local_x <= (10 + (23 - emblem_local_y)))) ||
-                              ((emblem_local_x >= (30 - (23 - emblem_local_y))) && 
-                               (emblem_local_x <= (32 - (23 - emblem_local_y)))))) begin
+                    
+                    // === CHEVRON (inverted V shape) ===
+                    
+                    // White inner chevron stripes (left and right bands)
+                    // Forms inner white diagonal stripes going down and inward
+                    // Extends to emblem outline
+                    else if (((emblem_local_y >= 17 && emblem_local_y <= 31)) &&
+                             (((emblem_local_x >= (7 + (28 - emblem_local_y))) && 
+                               (emblem_local_x <= (9 + (28 - emblem_local_y)))) ||
+                              ((emblem_local_x >= (31 - (28 - emblem_local_y))) && 
+                               (emblem_local_x <= (33 - (28 - emblem_local_y)))))) begin
                         layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11;
                     end
-                    else if (((emblem_local_y >= 12 && emblem_local_y <= 25)) &&
-                             (((emblem_local_x >= (5 + (24 - emblem_local_y))) && 
-                               (emblem_local_x <= (8 + (24 - emblem_local_y)))) ||
-                              ((emblem_local_x >= (32 - (24 - emblem_local_y))) && 
-                               (emblem_local_x <= (35 - (24 - emblem_local_y)))))) begin
+                    // Black outer chevron bands (left and right bands)
+                    // Forms outer black diagonal bands flanking the white stripes
+                    // Extends below white to create bottom outline
+                    else if (((emblem_local_y >= 15 && emblem_local_y <= 31)) &&
+                             (((emblem_local_x >= (4 + (29 - emblem_local_y))) && 
+                               (emblem_local_x <= (9 + (29 - emblem_local_y)))) ||
+                              ((emblem_local_x >= (31 - (29 - emblem_local_y))) && 
+                               (emblem_local_x <= (36 - (29 - emblem_local_y)))))) begin
                         layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b00; emblem_g <= 2'b00; emblem_b <= 2'b00;
                     end
+                    
+                    // === WHITE INNER BORDER (shield outline) ===
+                    // Forms the white border just inside the black outer edge
                     else if (
                         ((emblem_local_y == 2) && 
                          (emblem_local_x >= 1 && emblem_local_x <= 38)) ||
@@ -278,6 +295,10 @@ always @(posedge clk) begin
                         layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11;
                     end
+                    
+                    // === GOLD BACKGROUND ===
+                    // Gold/yellow background fill for the shield
+                    // Contains the red lions on top
                     else if (
                         ((emblem_local_y >= 3 && emblem_local_y <= 15) && 
                          (emblem_local_x >= 2 && emblem_local_x <= 37)) ||
@@ -296,6 +317,10 @@ always @(posedge clk) begin
                         layers[LAYER_OBSTACLE] <= 1'b1;
                         emblem_r <= 2'b11; emblem_g <= 2'b10; emblem_b <= 2'b00;
                     end
+                    
+                    // === BLACK OUTER BORDER ===
+                    // Outermost black border of the shield
+                    // Defines the shield's triangular shape
                     else if (
                         ((emblem_local_y <= 1) && 
                          (emblem_local_x >= 2 && emblem_local_x <= 37)) ||

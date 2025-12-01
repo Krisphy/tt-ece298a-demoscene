@@ -1,3 +1,6 @@
+## Testing
+Note this test bench is not used for the testing of our project, you should use the verilator/* directory to test. This is because the verilator can handle live button inputs. This directory remains to keep the github actions in check.
+
 # Sample testbench for a Tiny Tapeout project
 
 This is a sample testbench for a Tiny Tapeout project. It uses [cocotb](https://docs.cocotb.org/en/stable/) to drive the DUT and check the outputs.
