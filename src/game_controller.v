@@ -28,8 +28,11 @@ module game_controller (
     output wire game_halt,
     output wire game_start_blink,
     
-    // Obstacle state outputs - now support 3 obstacles
-    output reg [2:0] obstacle_active
+    // Obstacle state outputs
+    output reg obstacle_active,
+    
+    // Speed control output (5 bits allows up to level 31)
+    output reg [4:0] speed_level
 );
 
 // ============================================================================
@@ -38,8 +41,12 @@ module game_controller (
 
 localparam START_TIME = 30000000;  // ~1.2 seconds at 25MHz
 
+// Speed progression: increase every 5 seconds of gameplay
+localparam SPEED_UP_INTERVAL = 125000000;  // 5 seconds at 25MHz
+
 reg [24:0] start_ctr;
 reg reset_button_prev;
+reg [26:0] speed_timer;  // Timer for speed progression
 
 // Reset button edge detection - trigger on rising edge
 wire reset_button_pressed = reset_button && !reset_button_prev;
@@ -49,48 +56,22 @@ assign game_halt = game_over || (start_ctr < START_TIME);
 assign game_start_blink = (start_ctr >= START_TIME) || start_ctr[22] || game_over;
 
 // ============================================================================
-// Obstacle State Management
+// Obstacle State Management - Always Active
 // ============================================================================
 
-// Obstacle dimensions (must match rendering.v)
-localparam UW_WIDTH = 40;
+// Keep obstacle always active for continuous gameplay
+// It will naturally wrap around as scrolladdr increments and wraps
 
-// Multiple obstacles can be active at once
-// Obstacle spawn positions are staggered to create continuous challenges
-// Obstacles move RIGHT to LEFT (start at right edge, exit left)
 always @(posedge clk) begin
     if (!rst_n) begin
-        obstacle_active <= 3'b000;
+        obstacle_active <= 1'b0;
     end
-    else begin
-        // Obstacle 0: spawns at scrolladdr 0-10, at position 640-scrolladdr
-        // Deactivates when completely off left: scrolladdr > 680 (640 + 40)
-        if (scrolladdr[9:0] >= 10'd0 && scrolladdr[9:0] < 10'd10) begin
-            obstacle_active[0] <= 1'b1;
-        end
-        else if (scrolladdr[9:0] > 10'd680) begin
-            obstacle_active[0] <= 1'b0;
-        end
-        
-        // Obstacle 1: spawns at scrolladdr 200-210, at position 640-scrolladdr+200
-        // Deactivates when completely off left: scrolladdr > 880 (640 + 200 + 40)
-        if (scrolladdr[9:0] >= 10'd200 && scrolladdr[9:0] < 10'd210) begin
-            obstacle_active[1] <= 1'b1;
-        end
-        else if (scrolladdr[9:0] > 10'd880) begin
-            obstacle_active[1] <= 1'b0;
-        end
-        
-        // Obstacle 2: spawns at scrolladdr 400-410, at position 640-scrolladdr+400
-        // Deactivates when completely off left: scrolladdr > 1080
-        // Since 1080 > 1023 (10-bit max), it wraps to 56 (1080 - 1024 = 56)
-        if (scrolladdr[9:0] >= 10'd400 && scrolladdr[9:0] < 10'd410) begin
-            obstacle_active[2] <= 1'b1;
-        end
-        else if (scrolladdr[9:0] > 10'd56 && scrolladdr[9:0] < 10'd400) begin
-            // Deactivate when scrolladdr wrapped past 1024 and is now > 56
-            obstacle_active[2] <= 1'b0;
-        end
+    else if (game_reset) begin
+        obstacle_active <= 1'b0;
+    end
+    else if (!game_halt) begin
+        // Simply keep obstacle always active once game starts
+        obstacle_active <= 1'b1;
     end
 end
 
@@ -103,6 +84,8 @@ always @(posedge clk) begin
         game_over <= 1'b0;
         start_ctr <= 25'd0;
         reset_button_prev <= 1'b0;
+        speed_level <= 5'd0;
+        speed_timer <= 27'd0;
     end
     else begin
         // Track reset button for edge detection
@@ -117,10 +100,26 @@ always @(posedge clk) begin
         if (game_reset) begin
             game_over <= 1'b0;
             start_ctr <= START_TIME;  // Skip startup delay on reset
+            speed_level <= 5'd0;      // Reset speed to initial
+            speed_timer <= 27'd0;     // Reset speed timer
         end
         // Collision detection
         else if (collision && !game_over) begin
             game_over <= 1'b1;
+        end
+        
+        // Speed progression - increase speed every interval when game is running (NO LIMIT!)
+        if (!game_halt && !game_over) begin
+            speed_timer <= speed_timer + 27'd1;
+            
+            // Increase speed level every SPEED_UP_INTERVAL with saturation to prevent wraparound
+            if (speed_timer >= SPEED_UP_INTERVAL) begin
+                // Only increment if not at max (prevent overflow)
+                if (speed_level < 5'd31) begin
+                    speed_level <= speed_level + 5'd1;
+                end
+                speed_timer <= 27'd0;
+            end
         end
     end
 end

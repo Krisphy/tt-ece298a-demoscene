@@ -54,7 +54,8 @@ module tt_um_goose_game(
   wire game_reset;
   wire game_halt;
   wire game_start_blink;
-  wire [2:0] obstacle_active;  // 3 obstacles can be active simultaneously
+  wire obstacle_active;
+  wire [4:0] speed_level;
   
   // From jumping
   wire [6:0] jump_pos;
@@ -109,7 +110,8 @@ module tt_um_goose_game(
     .game_reset(game_reset),
     .game_halt(game_halt),
     .game_start_blink(game_start_blink),
-    .obstacle_active(obstacle_active)
+    .obstacle_active(obstacle_active),
+    .speed_level(speed_level)
   );
 
   // Jump physics
@@ -127,6 +129,7 @@ module tt_um_goose_game(
   scroll scroll_inst (
     .pos(scrolladdr),
     .halt(game_halt),
+    .speed_level(speed_level),
     .game_rst(game_reset),
     .clk(clk),
     .sys_rst(~rst_n)

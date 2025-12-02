@@ -2,17 +2,17 @@
 
 # Goose Game - DinoGame Style Runner for Tiny Tapeout
 
-A Chrome Dino-style endless runner game implemented in Verilog that outputs VGA video (640x480 @ 60Hz). Guide a goose as it jumps over obstacles featuring the University of Waterloo emblem!
+A Chrome Dino-style endless runner game implemented in Verilog that outputs VGA video (640x480 @ 60Hz). The player plays a goose that jumps over the University of Waterloo emblem.
 
 ## Overview
 
-This project implements a complete side-scrolling game with:
-- Real-time VGA output with 2-bit RGB color (8 colors)
-- Physics-based jump mechanics with parabolic trajectory
-- Scrolling background with animated ground texture
-- Collision detection
+This project implements a side-scrolling game with:
+- RGB222 VGA output (2-bit RGB color, 64 colors)
+- Parabolic jump movement
+- Scrolling ground texture
+- Pixel accurate collision detection
 - Game state management (startup, running, game over, reset)
-- Rendered sprites for the goose character and UW emblem obstacle
+- A custom rendered Goose and University of Waterloo emblem
 
 ## Architecture
 
@@ -38,21 +38,17 @@ All modules use synchronous reset and are optimized for minimal area usage.
 - `uo_out[3]`: VSync
 - `uo_out[2:0]`: Blue, Green, Red (MSBs)
 
-Provides 2-bit per channel RGB (8 total colors).
-
 ## Additional Notes
 
-- **Clock**: 25 MHz (VGA pixel clock)
-- **Resolution**: 640x480 @ 60Hz
-- **Collision**: Pixel-perfect detection between goose sprite and obstacle sprites
+- **Clock**: 25 MHz (Setup for 640x480 @ 60Hz)
 - **Hardware Requirements**: TinyVGA PMOD for VGA output, two push buttons for input
 
 ### Testing
 
-Run an interactive visual simulation with SDL2:
+Run an interactive visual simulation with SDL2, ensure the required libraries are installed:
 ```bash
 cd verilator
-make
+make all
 ./goosegame
 ```
 

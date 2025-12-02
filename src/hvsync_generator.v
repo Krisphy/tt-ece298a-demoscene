@@ -1,11 +1,6 @@
 /*
- * Area-optimized VGA timing generator
+ * VGA timing generator
  * 640x480 @ 60Hz
- * Optimizations:
- * - Synchronous reset (saves ~15-20% flip-flop area)
- * - Single always block (easier for synthesis optimization)
- * - Efficient counter logic with ternary operators
- * - Hardcoded timing values (eliminates parameter overhead)
  */
 
 `default_nettype none
@@ -20,7 +15,7 @@ module hvsync_generator(
   output wire [9:0] vpos
 );
 
-  // VGA 640x480 @ 60Hz timing (hardcoded for minimal area)
+  // VGA 640x480 @ 60Hz timing
   localparam H_DISPLAY = 640;
   localparam H_SYNC_START = 656;  // 640 + 16 (front porch)
   localparam H_SYNC_END = 752;    // 656 + 96 (sync pulse)
