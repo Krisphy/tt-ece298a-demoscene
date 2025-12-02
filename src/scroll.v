@@ -15,30 +15,28 @@ module scroll (
     input wire sys_rst
 );
 
-// Base scroll period - starts faster, gets MUCH faster at higher speed levels
-localparam [17:0] BASE_PERIOD = 18'd125000;     // 5ms at 25MHz (speed level 0) - ~80% faster than original
-localparam [17:0] SPEED_DECREMENT = 18'd15000;  // Reduction per level
-localparam [17:0] MIN_PERIOD = 18'd10000;       // Minimum period (prevents going impossibly fast)
-localparam [10:0] MOVE_STEP = 11'd2;            // Pixels per tick
+// Scroll period lookup table - no multiplier needed!
+// Pre-computed: BASE=125000, DECREMENT=15000, MIN=10000
+localparam [10:0] MOVE_STEP = 11'd2;
 
 reg [17:0] ctr;
 reg [17:0] current_period;
-reg [22:0] speed_reduction;  // Larger to handle multiplication
 
-// Calculate scroll period based on speed level
-// Each level reduces the period, making the game progressively faster
-// Formula: period = BASE_PERIOD - (speed_level * SPEED_DECREMENT)
-// But never go below MIN_PERIOD
+// Lookup table replaces expensive multiplication
 always @(*) begin
-    speed_reduction = speed_level * SPEED_DECREMENT;
-    
-    // Check if reduction would go below minimum
-    if (speed_reduction >= (BASE_PERIOD - MIN_PERIOD)) begin
-        current_period = MIN_PERIOD;  // Cap at minimum period (maximum speed)
-    end
-    else begin
-        current_period = BASE_PERIOD - speed_reduction[17:0];
-    end
+    case (speed_level[2:0])  // Only need 3 bits (levels 0-7, then max speed)
+        3'd0: current_period = 18'd125000;
+        3'd1: current_period = 18'd110000;
+        3'd2: current_period = 18'd95000;
+        3'd3: current_period = 18'd80000;
+        3'd4: current_period = 18'd65000;
+        3'd5: current_period = 18'd50000;
+        3'd6: current_period = 18'd35000;
+        3'd7: current_period = 18'd20000;
+        default: current_period = 18'd10000;
+    endcase
+    // After level 7, stay at max speed (10000)
+    if (speed_level >= 5'd8) current_period = 18'd10000;
 end
 
 always @(posedge clk) begin
