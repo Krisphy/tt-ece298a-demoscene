@@ -55,6 +55,7 @@ module tt_um_goose_game(
   wire game_halt;
   wire game_start_blink;
   wire obstacle_active;
+  wire [9:0] obstacle_pos;
   wire [4:0] speed_level;
   
   // From jumping
@@ -111,6 +112,7 @@ module tt_um_goose_game(
     .game_halt(game_halt),
     .game_start_blink(game_start_blink),
     .obstacle_active(obstacle_active),
+    .obstacle_pos(obstacle_pos),
     .speed_level(speed_level)
   );
 
@@ -144,6 +146,7 @@ module tt_um_goose_game(
     .game_over(game_over),
     .game_start_blink(game_start_blink),
     .obstacle_active(obstacle_active),
+    .obstacle_pos(obstacle_pos),
     .jump_pos(jump_pos),
     .vaddr(vpos),
     .haddr(hpos),

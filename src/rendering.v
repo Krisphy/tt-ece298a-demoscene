@@ -22,6 +22,7 @@ module rendering (
     input wire game_start_blink,
 
     input wire obstacle_active,  // From game_controller
+    input wire [9:0] obstacle_pos,  // Obstacle position counter (0-699)
     input wire [6:0] jump_pos,
     input wire [9:0] vaddr,
     input wire [9:0] haddr,
@@ -47,7 +48,7 @@ localparam [10:0] UW_WIDTH_PX = 11'd40;
 localparam [10:0] UW_HEIGHT_PX = 11'd48;
 localparam [10:0] OBSTACLE_TOP = FLOOR_Y - UW_HEIGHT_PX;
 localparam [10:0] SCREEN_WIDTH = 11'd640;
-localparam [10:0] OBSTACLE_OFFSET = 11'd334;  // Shifted to minimize gap at wrap
+localparam [10:0] OBSTACLE_OFFSET = 11'd50;
 
 localparam integer LAYER_GOOSE = 0;
 localparam integer LAYER_OBSTACLE = 1;
@@ -163,31 +164,20 @@ wire [COLOR_BITS-1:0] goose_color_idx =
     (game_over && goose_pixel_idx != COLOR_TRANSPARENT) ? COLOR_RED : goose_pixel_idx;
 wire [5:0] goose_rgb = palette(goose_color_idx);
 
-// Two obstacles at different positions for nearly continuous gameplay
-// Obstacle 1: uses scrolladdr directly with OBSTACLE_OFFSET = 334
-// Obstacle 2: offset by ~344 to fill the gap when obs1 wraps
-wire [10:0] obs1_x = SCREEN_WIDTH - scrolladdr + OBSTACLE_OFFSET;
-wire [10:0] obs2_x_pos = SCREEN_WIDTH - scrolladdr + OBSTACLE_OFFSET + 11'd344;
-
-// Check if either obstacle is in bounds
-wire [10:0] obs1_right = obs1_x + UW_WIDTH_PX;
-wire [10:0] obs2_right = obs2_x_pos + UW_WIDTH_PX;
-
-wire obs1_in_bounds = (haddr_ext >= obs1_x) && (haddr_ext < obs1_right) &&
-                      (vaddr_ext >= OBSTACLE_TOP) && (vaddr_ext < FLOOR_Y);
-wire obs2_in_bounds = (haddr_ext >= obs2_x_pos) && (haddr_ext < obs2_right) &&
-                      (vaddr_ext >= OBSTACLE_TOP) && (vaddr_ext < FLOOR_Y);
-
-wire obstacle_in_bounds = obstacle_active && display_on && (obs1_in_bounds || obs2_in_bounds);
-
-// Use obs1 or obs2 coordinates for emblem rendering based on which is visible
-wire [10:0] obs2_x = obs1_in_bounds ? obs1_x : obs2_x_pos;
+// Single obstacle using obstacle_pos counter (cycles 0-699 from game_controller)
+// Position uses obstacle_pos so obstacle respawns every 700 scroll units
+// Floor also needs to sync with this, so we output the cycle position
+wire [10:0] obs2_x = SCREEN_WIDTH - {1'b0, obstacle_pos} + OBSTACLE_OFFSET;
+wire [10:0] obstacle_right = obs2_x + UW_WIDTH_PX;
+wire obstacle_in_bounds = obstacle_active && display_on &&
+                          (haddr_ext >= obs2_x) && (haddr_ext < obstacle_right) &&
+                          (vaddr_ext >= OBSTACLE_TOP) && (vaddr_ext < FLOOR_Y);
 
 wire [5:0] emblem_local_x = obstacle_in_bounds ? (haddr_ext[5:0] - obs2_x[5:0]) : 6'd0;
 wire [5:0] emblem_local_y = obstacle_in_bounds ? (vaddr_ext[5:0] - OBSTACLE_TOP[5:0]) : 6'd0;
 
-// Floor dots scrolling position
-wire [10:0] floor_scroll_pos = haddr_ext + scrolladdr;
+// Floor dots scrolling position - use obstacle_pos to stay synced with emblem
+wire [10:0] floor_scroll_pos = haddr_ext + {1'b0, obstacle_pos};
 
 always @(posedge clk) begin
     if (sys_rst) begin

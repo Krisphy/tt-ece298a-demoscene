@@ -15,9 +15,9 @@ module scroll (
     input wire sys_rst
 );
 
-// Base scroll period - gets MUCH faster at higher speed levels
-localparam [17:0] BASE_PERIOD = 18'd250000;     // 10ms at 25MHz (speed level 0)
-localparam [17:0] SPEED_DECREMENT = 18'd35000;  // Aggressive reduction per level (14% faster each level!)
+// Base scroll period - starts faster, gets MUCH faster at higher speed levels
+localparam [17:0] BASE_PERIOD = 18'd125000;     // 5ms at 25MHz (speed level 0) - ~80% faster than original
+localparam [17:0] SPEED_DECREMENT = 18'd15000;  // Reduction per level
 localparam [17:0] MIN_PERIOD = 18'd10000;       // Minimum period (prevents going impossibly fast)
 localparam [10:0] MOVE_STEP = 11'd2;            // Pixels per tick
 

@@ -30,6 +30,7 @@ module game_controller (
     
     // Obstacle state outputs
     output reg obstacle_active,
+    output reg [9:0] obstacle_pos,  // Obstacle position counter (0-699)
     
     // Speed control output (5 bits allows up to level 31)
     output reg [4:0] speed_level
@@ -56,22 +57,43 @@ assign game_halt = game_over || (start_ctr < START_TIME);
 assign game_start_blink = (start_ctr >= START_TIME) || start_ctr[22] || game_over;
 
 // ============================================================================
-// Obstacle State Management - Always Active
+// Obstacle State Management - 700-unit Cycle Counter
 // ============================================================================
 
-// Keep obstacle always active for continuous gameplay
-// It will naturally wrap around as scrolladdr increments and wraps
+localparam [9:0] OBSTACLE_CYCLE = 10'd700;  // Obstacle respawns every 700 scroll units
+
+reg [9:0] obstacle_counter;  // Tracks position within cycle
+reg [9:0] scrolladdr_prev;
 
 always @(posedge clk) begin
     if (!rst_n) begin
         obstacle_active <= 1'b0;
+        obstacle_counter <= 10'd0;
+        obstacle_pos <= 10'd0;
+        scrolladdr_prev <= 10'd0;
     end
     else if (game_reset) begin
         obstacle_active <= 1'b0;
+        obstacle_counter <= 10'd0;
+        obstacle_pos <= 10'd0;
+        scrolladdr_prev <= 10'd0;
     end
     else if (!game_halt) begin
-        // Simply keep obstacle always active once game starts
         obstacle_active <= 1'b1;
+        obstacle_pos <= obstacle_counter;  // Output the counter
+        
+        // Detect scroll movement and increment counter
+        if (scrolladdr != scrolladdr_prev) begin
+            scrolladdr_prev <= scrolladdr;
+            
+            // Increment counter, wrap at OBSTACLE_CYCLE
+            if (obstacle_counter >= OBSTACLE_CYCLE - 10'd1) begin
+                obstacle_counter <= 10'd0;
+            end
+            else begin
+                obstacle_counter <= obstacle_counter + 10'd1;
+            end
+        end
     end
 end
 
