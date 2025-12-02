@@ -25,8 +25,8 @@ int main(int argc, char** argv) {
 
   Vtt_um_goose_game* top = new Vtt_um_goose_game;
 
-  // Set default inputs
-  top->ui_in = 0;
+  // Set default inputs (buttons active-low, so default high = not pressed)
+  top->ui_in = 0xFF;
   top->uio_in = 0;
   top->ena = 1;
   
@@ -143,8 +143,10 @@ int main(int argc, char** argv) {
     uint8_t reset_out = (reset_pulse_counter > 0) ? 1 : 0;
     last_reset_state = reset_button;
     
-    // Set input signals
-    top->ui_in = (reset_out << 1) | jump_button;
+    // Set input signals (active-low: 0 = pressed, 1 = not pressed)
+    uint8_t jump_low = jump_button ? 0 : 1;
+    uint8_t reset_low = reset_out ? 0 : 1;
+    top->ui_in = 0xFC | (reset_low << 1) | jump_low;
 
     // Get framebuffer pointer
     uint32_t* pixels;
@@ -170,10 +172,10 @@ int main(int argc, char** argv) {
           reset_pulse_counter--;
         }
         
-        // Update inputs after pulse counters
-        uint8_t jump_out = (jump_pulse_counter > 0) ? 1 : 0;
-        uint8_t reset_out_current = (reset_pulse_counter > 0) ? 1 : 0;
-        top->ui_in = (reset_out_current << 1) | jump_out;
+        // Update inputs after pulse counters (active-low: 0 = pressed)
+        uint8_t jump_out = (jump_pulse_counter > 0) ? 0 : 1;
+        uint8_t reset_out_current = (reset_pulse_counter > 0) ? 0 : 1;
+        top->ui_in = 0xFC | (reset_out_current << 1) | jump_out;
         
         // Sample outputs in visible area
         if (v < V_DISPLAY && h < H_DISPLAY) {

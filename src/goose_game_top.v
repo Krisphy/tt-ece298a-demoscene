@@ -38,12 +38,9 @@ module tt_um_goose_game(
   wire [9:0] hpos;
   wire [9:0] vpos;
 
-  // ============================================================================
-  // User Inputs
-  // ============================================================================
-  
-  wire jump_button = ui_in[0];
-  wire reset_button = ui_in[1];
+  // User Inputs (active-low, directly from debounced buttons)
+  wire jump_button = ~ui_in[0];
+  wire reset_button = ~ui_in[1];
 
   // ============================================================================
   // Inter-Module Signals
