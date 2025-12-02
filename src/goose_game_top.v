@@ -56,7 +56,7 @@ module tt_um_goose_game(
   wire game_start_blink;
   wire obstacle_active;
   wire [9:0] obstacle_pos;
-  wire [4:0] speed_level;
+  wire [3:0] speed_level;
   
   // From jumping
   wire [6:0] jump_pos;
@@ -99,11 +99,9 @@ module tt_um_goose_game(
     .vpos(vpos)
   );
 
-  // Game Controller - All game state logic
   game_controller game_ctrl(
     .clk(clk),
     .rst_n(rst_n),
-    .jump_button(jump_button),
     .reset_button(reset_button),
     .collision(collision),
     .scrolladdr(scrolladdr[9:0]),
