@@ -7,14 +7,14 @@
 module scroll (
     input wire halt,
     input wire [2:0] speed_level,
-    output reg [10:0] pos,
+    output reg [9:0] pos,
     output wire [17:0] period_out,
     input wire game_rst,
     input wire clk,
     input wire sys_rst
 );
 
-localparam [10:0] MOVE_STEP = 11'd2;
+localparam [9:0] MOVE_STEP = 10'd2;
 
 reg [17:0] ctr;
 reg [17:0] current_period;
@@ -36,7 +36,7 @@ end
 
 always @(posedge clk) begin
     if (game_rst || sys_rst) begin
-        pos <= 11'd0;
+        pos <= 10'd0;
         ctr <= 18'd0;
     end
     else if (!halt) begin

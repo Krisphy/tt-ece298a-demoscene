@@ -53,7 +53,7 @@ module tt_um_goose_game(
   wire [6:0] jump_pos;
   
   // From scroll
-  wire [10:0] scrolladdr;
+  wire [9:0] scrolladdr;
   wire [17:0] scroll_period;
   
   // From rendering
@@ -97,7 +97,7 @@ module tt_um_goose_game(
     .rst_n(rst_n),
     .reset_button(reset_button),
     .collision(collision),
-    .scrolladdr(scrolladdr[9:0]),
+    .scrolladdr(scrolladdr),
     .game_over(game_over),
     .game_reset(game_reset),
     .obstacle_pos(obstacle_pos),

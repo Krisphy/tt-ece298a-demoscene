@@ -134,9 +134,8 @@ wire goose_in_bounds = goose_x_in_bounds &&
                        (vaddr_ext >= goose_y) && (vaddr_ext < (goose_y + GOOSE_HEIGHT_PX));
 wire goose_active = goose_in_bounds && display_on;
 
-wire [10:0] goose_diff_y_full = vaddr_ext - goose_y;
 wire [3:0] goose_rom_x = haddr_ext[4:1];
-wire [3:0] goose_rom_y = goose_diff_y_full[4:1];
+wire [3:0] goose_rom_y = vaddr_ext[4:1] - goose_y[4:1];
 
 wire [COLOR_BITS*GOOSE_ROM_WIDTH-1:0] goose_row_bits = goose_rom[goose_rom_y];
 wire [COLOR_BITS-1:0] goose_pixel_raw = goose_pixel_from_row(goose_row_bits, goose_rom_x);
@@ -154,7 +153,7 @@ wire obstacle_in_bounds = display_on &&
 wire [5:0] emblem_local_x = obstacle_in_bounds ? (haddr_ext[5:0] - obs2_x[5:0]) : 6'd0;
 wire [5:0] emblem_local_y = obstacle_in_bounds ? (vaddr_ext[5:0] - OBSTACLE_TOP[5:0]) : 6'd0;
 
-wire [10:0] floor_scroll_pos = haddr_ext + {1'b0, obstacle_pos};
+wire [3:0] floor_scroll_pos = haddr_ext[3:0] + obstacle_pos[3:0];
 
 always @(posedge clk) begin
     if (sys_rst) begin

@@ -21,7 +21,8 @@ reg [5:0] frame;
 reg in_air;
 reg [6:0] y_table[25:0];
 
-wire [4:0] table_idx = (frame <= 6'd25) ? frame[4:0] : (5'd50 - frame[4:0]);
+wire [5:0] mirror_frame = 6'd50 - frame;
+wire [4:0] table_idx = (frame <= 6'd25) ? frame[4:0] : mirror_frame[4:0];
 
 always @(posedge clk) begin
     if (game_rst || sys_rst) begin
