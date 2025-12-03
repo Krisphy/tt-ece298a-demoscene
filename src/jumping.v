@@ -14,16 +14,19 @@ module jumping (
     input wire sys_rst
 );
 
+// Jump speed scales with scroll speed (2x scroll period)
 wire [18:0] jump_speed = {scroll_period, 1'b0};  // scroll_period << 1
 
-reg [18:0] ctr;
-reg [5:0] frame;
-reg in_air;
-reg [6:0] y_table[25:0];
+reg [18:0] ctr;      // Counter for jump animation timing
+reg [5:0] frame;     // Current frame in jump cycle
+reg in_air;          // Jump state flag
+reg [6:0] y_table[25:0];  // Jump height lookup table (parabolic curve)
 
+// Mirror frame index for symmetric jump
 wire [5:0] mirror_frame = 6'd50 - frame;
 wire [4:0] table_idx = (frame <= 6'd25) ? frame[4:0] : mirror_frame[4:0];
 
+// Jump physics state machine
 always @(posedge clk) begin
     if (game_rst || sys_rst) begin
         ctr <= 19'd0;
@@ -32,13 +35,16 @@ always @(posedge clk) begin
         jump_pos <= 7'd0;
     end
     else begin
+        // Output current jump height from lookup table
         jump_pos <= y_table[table_idx];
         if (!halt) begin
             if (in_air) begin
+                // Advance jump animation every jump_speed cycles
                 ctr <= ctr + 19'd1;
                 if (ctr == jump_speed) begin
                     ctr <= 19'd0;
                     frame <= frame + 6'd1;
+                    // Complete jump cycle: 50 frames (25 up, 25 down)
                     if (frame + 6'd1 >= 6'd50) begin
                         frame <= 6'd0;
                         in_air <= 1'b0;
@@ -46,11 +52,12 @@ always @(posedge clk) begin
                 end
             end
             else if (jump)
-                in_air <= 1'b1;
+                in_air <= 1'b1;  // Start jump on button press
         end
     end
 end
 
+// Jump trajectory: parabolic curve from 0 to 104 pixels
 initial begin
     y_table[0]  = 7'd0;   y_table[1]  = 7'd8;   y_table[2]  = 7'd16;  y_table[3]  = 7'd23;
     y_table[4]  = 7'd30;  y_table[5]  = 7'd36;  y_table[6]  = 7'd43;  y_table[7]  = 7'd49;

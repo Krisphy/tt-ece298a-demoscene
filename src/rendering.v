@@ -54,6 +54,7 @@ localparam [COLOR_BITS-1:0] COLOR_RED = 3'd4;
 
 reg [COLOR_BITS*GOOSE_ROM_WIDTH-1:0] goose_rom [0:GOOSE_ROM_HEIGHT-1];
 
+// Color palette: converts color index to RGB222
 function [5:0] palette;
     input [COLOR_BITS-1:0] idx;
     begin
@@ -67,6 +68,7 @@ function [5:0] palette;
     end
 endfunction
 
+// Extract pixel color from packed ROM row
 function [COLOR_BITS-1:0] goose_pixel_from_row;
     input [COLOR_BITS*GOOSE_ROM_WIDTH-1:0] row_bits;
     input [3:0] px;
@@ -100,8 +102,10 @@ initial begin
     goose_rom[15] = 48'b000000000000010010000000000010010000000000000000;
 end
 
+// Collision detection: goose and obstacle overlap
 assign collision = layers[LAYER_GOOSE] & layers[LAYER_OBSTACLE];
 
+// Layer compositing: priority order (goose > obstacle > floor dots > floor > sky)
 wire [1:0] final_r, final_g, final_b;
 assign final_r = (layers[LAYER_GOOSE] ? goose_r :
                   layers[LAYER_OBSTACLE] ? emblem_r :
@@ -128,6 +132,7 @@ assign B = display_on ? final_b : 2'b00;
 wire [10:0] vaddr_ext = {1'b0, vaddr};
 wire [10:0] haddr_ext = {1'b0, haddr};
 
+// Goose sprite positioning and bounds checking
 wire [10:0] goose_y = GOOSE_Y_BASE - {4'd0, jump_pos};
 wire goose_x_in_bounds = (haddr_ext[10:5] == 6'b000010);
 wire goose_in_bounds = goose_x_in_bounds &&
@@ -144,17 +149,19 @@ wire [COLOR_BITS-1:0] goose_color_idx =
     (game_over && goose_pixel_idx != COLOR_TRANSPARENT) ? COLOR_RED : goose_pixel_idx;
 wire [5:0] goose_rgb = palette(goose_color_idx);
 
-wire [10:0] obs2_x = SCREEN_WIDTH - {1'b0, obstacle_pos} + OBSTACLE_OFFSET;
-wire [10:0] obstacle_right = obs2_x + UW_WIDTH_PX;
+// Obstacle (emblem) positioning and bounds checking
+wire [10:0] obstacle_x = SCREEN_WIDTH - {1'b0, obstacle_pos} + OBSTACLE_OFFSET;
+wire [10:0] obstacle_right = obstacle_x + UW_WIDTH_PX;
 wire obstacle_in_bounds = display_on &&
-                          (haddr_ext >= obs2_x) && (haddr_ext < obstacle_right) &&
+                          (haddr_ext >= obstacle_x) && (haddr_ext < obstacle_right) &&
                           (vaddr_ext >= OBSTACLE_TOP) && (vaddr_ext < FLOOR_Y);
 
-wire [5:0] emblem_local_x = obstacle_in_bounds ? (haddr_ext[5:0] - obs2_x[5:0]) : 6'd0;
+wire [5:0] emblem_local_x = obstacle_in_bounds ? (haddr_ext[5:0] - obstacle_x[5:0]) : 6'd0;
 wire [5:0] emblem_local_y = obstacle_in_bounds ? (vaddr_ext[5:0] - OBSTACLE_TOP[5:0]) : 6'd0;
 
 wire [3:0] floor_scroll_pos = haddr_ext[3:0] + obstacle_pos[3:0];
 
+// Pixel-by-pixel rendering pipeline
 always @(posedge clk) begin
     if (sys_rst) begin
         layers <= 5'd0;
@@ -166,6 +173,7 @@ always @(posedge clk) begin
         emblem_b <= 2'b00;
     end
     else begin
+        // Clear all layers and colors each cycle
         layers <= 5'd0;
         goose_r <= 2'b00;
         goose_g <= 2'b00;
@@ -195,6 +203,7 @@ always @(posedge clk) begin
                 {goose_r, goose_g, goose_b} <= goose_rgb;
             end
 
+            // Render University of Waterloo emblem (obstacle)
             if (obstacle_in_bounds) begin
                 // Red lions
                 if (((emblem_local_y >= 7 && emblem_local_y <= 13) && 

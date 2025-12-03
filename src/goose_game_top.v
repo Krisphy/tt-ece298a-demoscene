@@ -94,7 +94,7 @@ module tt_um_goose_game(
   // Game Controller, controls the game state and logic
   game_controller game_ctrl(
     .clk(clk),
-    .rst_n(rst_n),
+    .sys_rst(~rst_n),
     .reset_button(reset_button),
     .collision(collision),
     .scrolladdr(scrolladdr),

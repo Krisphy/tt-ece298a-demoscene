@@ -29,12 +29,12 @@ module hvsync_generator(
   reg [9:0] h_count;
   reg [9:0] v_count;
 
-  // Single always block with synchronous reset for minimal area
+  // VGA timing state machine
   always @(posedge clk) begin
     if (reset) begin
       h_count <= 10'd0;
       v_count <= 10'd0;
-      hsync <= 1'b1;
+      hsync <= 1'b1;  // Sync inactive (high) during reset
       vsync <= 1'b1;
     end else begin
       // Horizontal counter - increment every clock
@@ -54,6 +54,7 @@ module hvsync_generator(
 
   // Display enable - single centralized check saves area in rendering modules
   assign display_on = (h_count < H_DISPLAY) && (v_count < V_DISPLAY);
+  // Pixel position outputs for rendering engine
   assign hpos = h_count;
   assign vpos = v_count;
 

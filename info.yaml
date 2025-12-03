@@ -29,7 +29,7 @@ project:
 pinout:
   # Inputs
   ui[0]: "bt1_n"
-  ui[1]: "rst_n"
+  ui[1]: "game_rst_n"
   ui[2]: ""
   ui[3]: ""
   ui[4]: ""

@@ -6,7 +6,7 @@
 
 module game_controller (
     input wire clk,
-    input wire rst_n,
+    input wire sys_rst,
     input wire reset_button,
     input wire collision,
     input wire [9:0] scrolladdr,
@@ -15,7 +15,7 @@ module game_controller (
     output wire game_reset,
     
     output reg [9:0] obstacle_pos,
-    output reg [2:0] speed_level  // 3 bits (0-7)
+    output reg [2:0] speed_level  // (0-7)
 );
 
 localparam SPEED_UP_INTERVAL = 125000000;
@@ -30,7 +30,7 @@ wire reset_button_pressed = reset_button && !reset_button_prev;
 assign game_reset = reset_button_pressed;
 
 always @(posedge clk) begin
-    if (!rst_n) begin
+    if (sys_rst) begin
         obstacle_pos <= 10'd0;
         scrolladdr_prev <= 10'd0;
     end
@@ -47,7 +47,7 @@ always @(posedge clk) begin
 end
 
 always @(posedge clk) begin
-    if (!rst_n) begin
+    if (sys_rst) begin
         game_over <= 1'b0;
         reset_button_prev <= 1'b0;
         speed_level <= 3'd0;

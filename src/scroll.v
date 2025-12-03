@@ -19,8 +19,10 @@ localparam [9:0] MOVE_STEP = 10'd2;
 reg [17:0] ctr;
 reg [17:0] current_period;
 
+// Output current period for jump speed calculation
 assign period_out = current_period;
 
+// Lookup table: convert speed_level to scroll period (lower = faster)
 always @(*) begin
     case (speed_level)
         3'd0: current_period = 18'd110000;
@@ -34,6 +36,7 @@ always @(*) begin
     endcase
 end
 
+// Scroll position counter: increments every current_period cycles
 always @(posedge clk) begin
     if (game_rst || sys_rst) begin
         pos <= 10'd0;
