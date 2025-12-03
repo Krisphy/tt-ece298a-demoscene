@@ -1,41 +1,64 @@
 ![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
 
-# Tiny Tapeout Verilog Project Template
+# Goose Game - DinoGame Style Runner for Tiny Tapeout
 
-- [Read the documentation for project](docs/info.md)
+A Chrome Dino Game-style endless runner implemented in Verilog and deployable through the TinyTapeout ASIC workflow. The player controls a goose that jumps over the University of Waterloo emblem. Video is output through VGA at 640x480 60Hz (With the correct clock input).
 
-## What is Tiny Tapeout?
+## Overview
 
-Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+This project implements a side-scrolling game with:
+- Button-based control for jump and reset
+- RGB222 VGA output (2-bit RGB color, 64 colors)
+- Parabolic jump movement
+- Scrolling ground texture
+- Pixel accurate collision detection
+- Game state management (running, game over, reset)
+- A custom rendered Goose and University of Waterloo emblem
+- Incremental speedups for difficulty
 
-To learn more and get started, visit https://tinytapeout.com.
+## Architecture
 
-## Set up your Verilog project
+The design is organized into five main modules:
 
-1. Add your Verilog files to the `src` folder.
-2. Edit the [info.yaml](info.yaml) and update information about your project, paying special attention to the `source_files` and `top_module` properties. If you are upgrading an existing Tiny Tapeout project, check out our [online info.yaml migration tool](https://tinytapeout.github.io/tt-yaml-upgrade-tool/).
-3. Edit [docs/info.md](docs/info.md) and add a description of your project.
-4. Adapt the testbench to your design. See [test/README.md](test/README.md) for more information.
+- **`game_controller.v`**: Central game logic including FSM (startup, running, game over), collision handling, obstacle spawning, and reset detection
+- **`rendering.v`**: VGA rendering engine with sprite storage, layered compositing, and collision detection logic
+- **`jumping.v`**: Jump physics using ROM-based lookup table with mirrored ascent/descent for space optimization
+- **`scroll.v`**: Horizontal scrolling logic with configurable speed
+- **`hvsync_generator.v`**: VGA timing signal generation (hsync, vsync, display_on)
 
-The GitHub action will automatically build the ASIC files using [OpenLane](https://www.zerotoasiccourse.com/terminology/openlane/).
+insert diagram here
 
-## Enable GitHub actions to build the results page
+## Inputs and Outputs
 
-- [Enabling GitHub Pages](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)
+### Inputs
+- `ui_in[0]`: Jump button (Active Low)
+- `ui_in[1]`: Reset button (Active Low)
+- `clk`: 25MHz clock (or 25.175MHz for exact VGA 640x480 @ 60Hz timing)
 
-## Resources
+### Outputs (TinyVGA PMOD Format)
+- `uo_out[7]`: HSync
+- `uo_out[6:4]`: Blue, Green, Red (LSBs)
+- `uo_out[3]`: VSync
+- `uo_out[2:0]`: Blue, Green, Red (MSBs)
 
-- [FAQ](https://tinytapeout.com/faq/)
-- [Digital design lessons](https://tinytapeout.com/digital_design/)
-- [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
-- [Join the community](https://tinytapeout.com/discord)
-- [Build your design locally](https://www.tinytapeout.com/guides/local-hardening/)
+The remaining Tiny Tapeout inputs and bidirectional IOs are unused. The chip is best paired with the TinyVGA PMOD for VGA output.
 
-## What next?
+## Gameplay
+Gameplay is simple: the user has access to just the jump button and reset button. Jump over the obstacles, and if you lose, press reset to play again! A lost game state is indicated by an all-red goose and the visuals being halted.
 
-- [Submit your design to the next shuttle](https://app.tinytapeout.com/).
-- Edit [this README](README.md) and explain your design, how it works, and how to test it.
-- Share your project on your social network of choice:
-  - LinkedIn [#tinytapeout](https://www.linkedin.com/search/results/content/?keywords=%23tinytapeout) [@TinyTapeout](https://www.linkedin.com/company/100708654/)
-  - Mastodon [#tinytapeout](https://chaos.social/tags/tinytapeout) [@matthewvenn](https://chaos.social/@matthewvenn)
-  - X (formerly Twitter) [#tinytapeout](https://twitter.com/hashtag/tinytapeout) [@tinytapeout](https://twitter.com/tinytapeout)
+## Testing
+
+To run a visual simulation of the game with SDL2, ensure the required libraries are installed (see `verilator/README.md`) and run the following commands:
+```bash
+cd verilator
+make all
+./goosegame
+```
+
+**Controls:**
+- `SPACE` or `↑` = Jump
+- `R` = Reset game
+- `ESC` = Quit
+
+For detailed information about the project, see [docs/info.md](docs/info.md).  
+For information about the verilator test bench, see [verilator/README.md](verilator/README.md).
