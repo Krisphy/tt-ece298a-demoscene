@@ -87,13 +87,8 @@ int main(int argc, char** argv) {
 
   // Main loop
   bool quit = false;
-  uint8_t jump_button = 0;
-  uint8_t jump_button_held = 0;
-  uint8_t reset_button = 0;
-  bool last_jump_state = false;
-  bool last_reset_state = false;
-  int jump_pulse_counter = 0;
-  int reset_pulse_counter = 0;
+  uint8_t jump_held = 0;
+  uint8_t reset_held = 0;
   
   while (!quit) {
     // Handle events
@@ -109,10 +104,10 @@ int main(int argc, char** argv) {
             break;
           case SDLK_SPACE:
           case SDLK_UP:
-            jump_button_held = 1;
+            jump_held = 1;
             break;
           case SDLK_r:
-            reset_button = 1;  // Press reset
+            reset_held = 1;
             break;
         }
       }
@@ -120,32 +115,18 @@ int main(int argc, char** argv) {
         switch (event.key.keysym.sym) {
           case SDLK_SPACE:
           case SDLK_UP:
-            jump_button_held = 0;
+            jump_held = 0;
             break;
           case SDLK_r:
-            reset_button = 0;  // Release reset
+            reset_held = 0;
             break;
         }
       }
     }
 
-    // Generate short pulse from button press (hardware has pulse stretching too)
-    if (jump_button_held && !last_jump_state) {
-      jump_pulse_counter = 1000;  // ~40us pulse at 25MHz
-    }
-    jump_button = (jump_pulse_counter > 0) ? 1 : 0;
-    last_jump_state = jump_button_held;
-    
-    // Generate pulse for reset button (edge-triggered in hardware)
-    if (reset_button && !last_reset_state) {
-      reset_pulse_counter = 1000;  // ~40us pulse at 25MHz
-    }
-    uint8_t reset_out = (reset_pulse_counter > 0) ? 1 : 0;
-    last_reset_state = reset_button;
-    
-    // Set input signals (active-low: 0 = pressed, 1 = not pressed)
-    uint8_t jump_low = jump_button ? 0 : 1;
-    uint8_t reset_low = reset_out ? 0 : 1;
+    // Pass raw button state directly (active-low: 0 = pressed, 1 = not pressed)
+    uint8_t jump_low = jump_held ? 0 : 1;
+    uint8_t reset_low = reset_held ? 0 : 1;
     top->ui_in = 0xFC | (reset_low << 1) | jump_low;
 
     // Get framebuffer pointer
@@ -163,19 +144,6 @@ int main(int argc, char** argv) {
         // Clock the system
         top->clk = 0; top->eval(); 
         top->clk = 1; top->eval();
-        
-        // Decrement pulse counters
-        if (jump_pulse_counter > 0) {
-          jump_pulse_counter--;
-        }
-        if (reset_pulse_counter > 0) {
-          reset_pulse_counter--;
-        }
-        
-        // Update inputs after pulse counters (active-low: 0 = pressed)
-        uint8_t jump_out = (jump_pulse_counter > 0) ? 0 : 1;
-        uint8_t reset_out_current = (reset_pulse_counter > 0) ? 0 : 1;
-        top->ui_in = 0xFC | (reset_out_current << 1) | jump_out;
         
         // Sample outputs in visible area
         if (v < V_DISPLAY && h < H_DISPLAY) {
