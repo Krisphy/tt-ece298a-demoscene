@@ -1,103 +1,76 @@
 /*
  * Game Controller for Goose Game
- * 
- * Manages all game state logic:
- * - Game state FSM (running, game over, reset)
- * - Obstacle spawn/despawn
- * - Collision handling
  */
 
 `default_nettype none
 
 module game_controller (
-    // Clock and reset
     input wire clk,
-    input wire rst_n,
-    
-    // User inputs
-    input wire jump_button,
+    input wire sys_rst,
     input wire reset_button,
-    
-    // Inputs from other modules
     input wire collision,
     input wire [9:0] scrolladdr,
     
-    // Game state outputs
     output reg game_over,
     output wire game_reset,
-    output wire game_halt,
-    output wire game_start_blink,
     
-    // Obstacle state outputs
-    output reg obstacle_active
+    output reg [9:0] obstacle_pos,
+    output reg [2:0] speed_level  // (0-7)
 );
 
-// ============================================================================
-// Game State Machine
-// ============================================================================
+localparam SPEED_UP_INTERVAL = 125000000;
+localparam [9:0] OBSTACLE_CYCLE = 10'd700;
 
-localparam START_TIME = 30000000;  // ~1.2 seconds at 25MHz
-
-reg [24:0] start_ctr;
 reg reset_button_prev;
+reg [26:0] speed_timer;
+reg [9:0] scrolladdr_prev;
 
-// Reset button edge detection - trigger on rising edge
 wire reset_button_pressed = reset_button && !reset_button_prev;
 
 assign game_reset = reset_button_pressed;
-assign game_halt = game_over || (start_ctr < START_TIME);
-assign game_start_blink = (start_ctr >= START_TIME) || start_ctr[22] || game_over;
-
-// ============================================================================
-// Obstacle State Management
-// ============================================================================
-
-// Obstacle dimensions (must match rendering.v)
-localparam UW_WIDTH = 40;
 
 always @(posedge clk) begin
-    if (!rst_n) begin
-        obstacle_active <= 1'b0;
+    if (sys_rst) begin
+        obstacle_pos <= 10'd0;
+        scrolladdr_prev <= 10'd0;
     end
-    else begin
-        // Obstacle 1: UW emblem (spawns at 250 offset)
-        // We use only scrolladdr[9:0]
-        if (scrolladdr[9:0] >= 10'd250 && scrolladdr[9:0] < 10'd260) begin
-            obstacle_active <= 1'b1;
-        end
-        else if (scrolladdr[9:0] > (10'd640 + 10'd250 + UW_WIDTH)) begin
-            obstacle_active <= 1'b0;
+    else if (game_reset) begin
+        obstacle_pos <= 10'd0;
+        scrolladdr_prev <= 10'd0;
+    end
+    else if (!game_over) begin
+        if (scrolladdr != scrolladdr_prev) begin
+            scrolladdr_prev <= scrolladdr;
+            obstacle_pos <= (obstacle_pos >= OBSTACLE_CYCLE - 10'd1) ? 10'd0 : obstacle_pos + 10'd1;
         end
     end
 end
 
-// ============================================================================
-// Game State FSM
-// ============================================================================
-
 always @(posedge clk) begin
-    if (!rst_n) begin
+    if (sys_rst) begin
         game_over <= 1'b0;
-        start_ctr <= 25'd0;
         reset_button_prev <= 1'b0;
+        speed_level <= 3'd0;
+        speed_timer <= 27'd0;
     end
     else begin
-        // Track reset button for edge detection
         reset_button_prev <= reset_button;
-        
-        // Start counter for initial delay
-        if (start_ctr < START_TIME) begin
-            start_ctr <= start_ctr + 25'd1;
-        end
 
-        // Game reset - restart the game
         if (game_reset) begin
             game_over <= 1'b0;
-            start_ctr <= START_TIME;  // Skip startup delay on reset
+            speed_level <= 3'd0;
+            speed_timer <= 27'd0;
         end
-        // Collision detection
-        else if (collision && !game_over) begin
+        else if (collision && !game_over)
             game_over <= 1'b1;
+        
+        if (!game_over) begin
+            speed_timer <= speed_timer + 27'd1;
+            if (speed_timer >= SPEED_UP_INTERVAL) begin
+                if (speed_level < 3'd7)
+                    speed_level <= speed_level + 3'd1;
+                speed_timer <= 27'd0;
+            end
         end
     end
 end

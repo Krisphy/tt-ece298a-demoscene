@@ -1,13 +1,5 @@
 /*
- * Video Controller / Rendering module for goose game
- * 
- * Pure rendering logic:
- * - Sprite storage and layer compositing
- * - Pixel-by-pixel rendering
- * - Color palette management
- * - Collision detection (combinational)
- * 
- * No game state logic - all state comes from game_controller
+ * Rendering module for goose game
  */
 
 `default_nettype none
@@ -19,13 +11,11 @@ module rendering (
     output wire collision,
 
     input wire game_over,
-    input wire game_start_blink,
 
-    input wire obstacle_active,  // From game_controller
+    input wire [9:0] obstacle_pos,
     input wire [6:0] jump_pos,
     input wire [9:0] vaddr,
     input wire [9:0] haddr,
-    input wire [10:0] scrolladdr,
     input wire display_on,
 
     input wire clk,
@@ -36,18 +26,14 @@ localparam [10:0] FLOOR_Y = 11'd240;
 
 localparam integer GOOSE_ROM_WIDTH = 16;
 localparam integer GOOSE_ROM_HEIGHT = 16;
-localparam [10:0] GOOSE_WIDTH_PX = 11'd32;
 localparam [10:0] GOOSE_HEIGHT_PX = 11'd32;
-localparam [10:0] GOOSE_X = 11'd64;
 localparam [10:0] GOOSE_Y_BASE = FLOOR_Y - GOOSE_HEIGHT_PX;
 
-localparam integer UW_WIDTH = 40;
-localparam integer UW_HEIGHT = 48;
 localparam [10:0] UW_WIDTH_PX = 11'd40;
 localparam [10:0] UW_HEIGHT_PX = 11'd48;
 localparam [10:0] OBSTACLE_TOP = FLOOR_Y - UW_HEIGHT_PX;
 localparam [10:0] SCREEN_WIDTH = 11'd640;
-localparam [10:0] OBSTACLE_OFFSET = 11'd250;
+localparam [10:0] OBSTACLE_OFFSET = 11'd50;
 
 localparam integer LAYER_GOOSE = 0;
 localparam integer LAYER_OBSTACLE = 1;
@@ -64,12 +50,11 @@ localparam [COLOR_BITS-1:0] COLOR_TRANSPARENT = 3'd0;
 localparam [COLOR_BITS-1:0] COLOR_GOOSE_BODY = 3'd1;
 localparam [COLOR_BITS-1:0] COLOR_BLACK = 3'd2;
 localparam [COLOR_BITS-1:0] COLOR_BEAK = 3'd3;
-localparam [COLOR_BITS-1:0] COLOR_GOLD = 3'd4;
-localparam [COLOR_BITS-1:0] COLOR_WHITE = 3'd5;
-localparam [COLOR_BITS-1:0] COLOR_RED = 3'd6;
+localparam [COLOR_BITS-1:0] COLOR_RED = 3'd4;
 
 reg [COLOR_BITS*GOOSE_ROM_WIDTH-1:0] goose_rom [0:GOOSE_ROM_HEIGHT-1];
 
+// Color palette: converts color index to RGB222
 function [5:0] palette;
     input [COLOR_BITS-1:0] idx;
     begin
@@ -77,14 +62,13 @@ function [5:0] palette;
             COLOR_GOOSE_BODY: palette = {2'b10, 2'b10, 2'b01};
             COLOR_BLACK:      palette = {2'b00, 2'b00, 2'b00};
             COLOR_BEAK:       palette = {2'b11, 2'b10, 2'b01};
-            COLOR_GOLD:       palette = {2'b11, 2'b10, 2'b00};
-            COLOR_WHITE:      palette = {2'b11, 2'b11, 2'b11};
             COLOR_RED:        palette = {2'b10, 2'b00, 2'b00};
             default:          palette = 6'b000000;
         endcase
     end
 endfunction
 
+// Extract pixel color from packed ROM row
 function [COLOR_BITS-1:0] goose_pixel_from_row;
     input [COLOR_BITS*GOOSE_ROM_WIDTH-1:0] row_bits;
     input [3:0] px;
@@ -118,8 +102,10 @@ initial begin
     goose_rom[15] = 48'b000000000000010010000000000010010000000000000000;
 end
 
+// Collision detection: goose and obstacle overlap
 assign collision = layers[LAYER_GOOSE] & layers[LAYER_OBSTACLE];
 
+// Layer compositing: priority order (goose > obstacle > floor dots > floor > sky)
 wire [1:0] final_r, final_g, final_b;
 assign final_r = (layers[LAYER_GOOSE] ? goose_r :
                   layers[LAYER_OBSTACLE] ? emblem_r :
@@ -146,15 +132,15 @@ assign B = display_on ? final_b : 2'b00;
 wire [10:0] vaddr_ext = {1'b0, vaddr};
 wire [10:0] haddr_ext = {1'b0, haddr};
 
+// Goose sprite positioning and bounds checking
 wire [10:0] goose_y = GOOSE_Y_BASE - {4'd0, jump_pos};
 wire goose_x_in_bounds = (haddr_ext[10:5] == 6'b000010);
 wire goose_in_bounds = goose_x_in_bounds &&
                        (vaddr_ext >= goose_y) && (vaddr_ext < (goose_y + GOOSE_HEIGHT_PX));
-wire goose_active = goose_in_bounds && game_start_blink && display_on;
+wire goose_active = goose_in_bounds && display_on;
 
-wire [10:0] goose_diff_y_full = vaddr_ext - goose_y;
 wire [3:0] goose_rom_x = haddr_ext[4:1];
-wire [3:0] goose_rom_y = goose_diff_y_full[4:1];
+wire [3:0] goose_rom_y = vaddr_ext[4:1] - goose_y[4:1];
 
 wire [COLOR_BITS*GOOSE_ROM_WIDTH-1:0] goose_row_bits = goose_rom[goose_rom_y];
 wire [COLOR_BITS-1:0] goose_pixel_raw = goose_pixel_from_row(goose_row_bits, goose_rom_x);
@@ -163,18 +149,19 @@ wire [COLOR_BITS-1:0] goose_color_idx =
     (game_over && goose_pixel_idx != COLOR_TRANSPARENT) ? COLOR_RED : goose_pixel_idx;
 wire [5:0] goose_rgb = palette(goose_color_idx);
 
-wire [10:0] obs2_x = SCREEN_WIDTH - scrolladdr + OBSTACLE_OFFSET;
-wire [10:0] obstacle_right = obs2_x + UW_WIDTH_PX;
-wire obstacle_in_bounds = obstacle_active && display_on &&
-                          (haddr_ext >= obs2_x) && (haddr_ext < obstacle_right) &&
+// Obstacle (emblem) positioning and bounds checking
+wire [10:0] obstacle_x = SCREEN_WIDTH - {1'b0, obstacle_pos} + OBSTACLE_OFFSET;
+wire [10:0] obstacle_right = obstacle_x + UW_WIDTH_PX;
+wire obstacle_in_bounds = display_on &&
+                          (haddr_ext >= obstacle_x) && (haddr_ext < obstacle_right) &&
                           (vaddr_ext >= OBSTACLE_TOP) && (vaddr_ext < FLOOR_Y);
 
-wire [5:0] emblem_local_x = obstacle_in_bounds ? (haddr_ext[5:0] - obs2_x[5:0]) : 6'd0;
+wire [5:0] emblem_local_x = obstacle_in_bounds ? (haddr_ext[5:0] - obstacle_x[5:0]) : 6'd0;
 wire [5:0] emblem_local_y = obstacle_in_bounds ? (vaddr_ext[5:0] - OBSTACLE_TOP[5:0]) : 6'd0;
 
-// Floor dots scrolling position
-wire [10:0] floor_scroll_pos = haddr_ext + scrolladdr;
+wire [3:0] floor_scroll_pos = haddr_ext[3:0] + obstacle_pos[3:0];
 
+// Pixel-by-pixel rendering pipeline
 always @(posedge clk) begin
     if (sys_rst) begin
         layers <= 5'd0;
@@ -186,6 +173,7 @@ always @(posedge clk) begin
         emblem_b <= 2'b00;
     end
     else begin
+        // Clear all layers and colors each cycle
         layers <= 5'd0;
         goose_r <= 2'b00;
         goose_g <= 2'b00;
@@ -215,72 +203,57 @@ always @(posedge clk) begin
                 {goose_r, goose_g, goose_b} <= goose_rgb;
             end
 
-            if (obstacle_active) begin
-                if (obstacle_in_bounds) begin
-                    // === RED LIONS (on gold background) ===
-                    
-                    // Upper left lion
-                    if (((emblem_local_y >= 7 && emblem_local_y <= 13) && 
-                         (emblem_local_x >= 7 && emblem_local_x <= 15)) &&
-                        (((emblem_local_y >= 8 && emblem_local_y <= 13) && (emblem_local_x >= 8 && emblem_local_x <= 13)) ||
-                         ((emblem_local_y >= 7 && emblem_local_y <= 9) && (emblem_local_x >= 12 && emblem_local_x <= 14)) ||
-                         ((emblem_local_y >= 9 && emblem_local_y <= 10) && (emblem_local_x >= 14 && emblem_local_x <= 15)))) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
-                    end
-                    // Upper right lion
-                    else if (((emblem_local_y >= 7 && emblem_local_y <= 13) && 
-                              (emblem_local_x >= 25 && emblem_local_x <= 33)) &&
-                             (((emblem_local_y >= 8 && emblem_local_y <= 13) && (emblem_local_x >= 27 && emblem_local_x <= 32)) ||
-                              ((emblem_local_y >= 7 && emblem_local_y <= 9) && (emblem_local_x >= 26 && emblem_local_x <= 28)) ||
-                              ((emblem_local_y >= 9 && emblem_local_y <= 10) && (emblem_local_x >= 25 && emblem_local_x <= 26)))) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
-                    end
-                    // Lower/bottom lion
-                    else if (((emblem_local_y >= 28 && emblem_local_y <= 37) && 
-                              (emblem_local_x >= 15 && emblem_local_x <= 25)) &&
-                             (((emblem_local_y >= 30 && emblem_local_y <= 37) && (emblem_local_x >= 16 && emblem_local_x <= 24)) ||
-                              ((emblem_local_y >= 28 && emblem_local_y <= 31) && (emblem_local_x >= 18 && emblem_local_x <= 22)) ||
-                              ((emblem_local_y >= 32 && emblem_local_y <= 33) && 
-                               ((emblem_local_x >= 15 && emblem_local_x <= 16) || (emblem_local_x >= 24 && emblem_local_x <= 25))))) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
-                    end
-                    
-                    // === CHEVRON (inverted V shape) ===
-                    
-                    // White inner chevron stripes (left and right bands)
-                    // Forms inner white diagonal stripes going down and inward
-                    // Extends to emblem outline
-                    else if (((emblem_local_y >= 17 && emblem_local_y <= 31)) &&
-                             (((emblem_local_x >= (7 + (28 - emblem_local_y))) && 
-                               (emblem_local_x <= (9 + (28 - emblem_local_y)))) ||
-                              ((emblem_local_x >= (31 - (28 - emblem_local_y))) && 
-                               (emblem_local_x <= (33 - (28 - emblem_local_y)))))) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11;
-                    end
-                    // Black outer chevron bands (left and right bands)
-                    // Forms outer black diagonal bands flanking the white stripes
-                    // Extends below white to create bottom outline
-                    else if (((emblem_local_y >= 15 && emblem_local_y <= 31)) &&
-                             (((emblem_local_x >= (4 + (29 - emblem_local_y))) && 
-                               (emblem_local_x <= (9 + (29 - emblem_local_y)))) ||
-                              ((emblem_local_x >= (31 - (29 - emblem_local_y))) && 
-                               (emblem_local_x <= (36 - (29 - emblem_local_y)))))) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b00; emblem_g <= 2'b00; emblem_b <= 2'b00;
-                    end
-                    
-                    // === WHITE INNER BORDER (shield outline) ===
-                    // Forms the white border just inside the black outer edge
-                    else if (
+            // Render University of Waterloo emblem (obstacle)
+            if (obstacle_in_bounds) begin
+                // Red lions
+                if (((emblem_local_y >= 7 && emblem_local_y <= 13) && 
+                     (emblem_local_x >= 7 && emblem_local_x <= 15)) &&
+                    (((emblem_local_y >= 8 && emblem_local_y <= 13) && (emblem_local_x >= 8 && emblem_local_x <= 13)) ||
+                     ((emblem_local_y >= 7 && emblem_local_y <= 9) && (emblem_local_x >= 12 && emblem_local_x <= 14)) ||
+                     ((emblem_local_y >= 9 && emblem_local_y <= 10) && (emblem_local_x >= 14 && emblem_local_x <= 15)))) begin
+                    layers[LAYER_OBSTACLE] <= 1'b1;
+                    emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                end
+                else if (((emblem_local_y >= 7 && emblem_local_y <= 13) && 
+                          (emblem_local_x >= 25 && emblem_local_x <= 33)) &&
+                         (((emblem_local_y >= 8 && emblem_local_y <= 13) && (emblem_local_x >= 27 && emblem_local_x <= 32)) ||
+                          ((emblem_local_y >= 7 && emblem_local_y <= 9) && (emblem_local_x >= 26 && emblem_local_x <= 28)) ||
+                          ((emblem_local_y >= 9 && emblem_local_y <= 10) && (emblem_local_x >= 25 && emblem_local_x <= 26)))) begin
+                    layers[LAYER_OBSTACLE] <= 1'b1;
+                    emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                end
+                else if (((emblem_local_y >= 28 && emblem_local_y <= 37) && 
+                          (emblem_local_x >= 15 && emblem_local_x <= 25)) &&
+                         (((emblem_local_y >= 30 && emblem_local_y <= 37) && (emblem_local_x >= 16 && emblem_local_x <= 24)) ||
+                          ((emblem_local_y >= 28 && emblem_local_y <= 31) && (emblem_local_x >= 18 && emblem_local_x <= 22)) ||
+                          ((emblem_local_y >= 32 && emblem_local_y <= 33) && 
+                           ((emblem_local_x >= 15 && emblem_local_x <= 16) || (emblem_local_x >= 24 && emblem_local_x <= 25))))) begin
+                    layers[LAYER_OBSTACLE] <= 1'b1;
+                    emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                end
+                // White chevron
+                else if (((emblem_local_y >= 17 && emblem_local_y <= 31)) &&
+                         (((emblem_local_x >= (7 + (28 - emblem_local_y))) && 
+                           (emblem_local_x <= (9 + (28 - emblem_local_y)))) ||
+                          ((emblem_local_x >= (31 - (28 - emblem_local_y))) && 
+                           (emblem_local_x <= (33 - (28 - emblem_local_y)))))) begin
+                    layers[LAYER_OBSTACLE] <= 1'b1;
+                    emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11;
+                end
+                // Black chevron
+                else if (((emblem_local_y >= 15 && emblem_local_y <= 31)) &&
+                         (((emblem_local_x >= (4 + (29 - emblem_local_y))) && 
+                           (emblem_local_x <= (9 + (29 - emblem_local_y)))) ||
+                          ((emblem_local_x >= (31 - (29 - emblem_local_y))) && 
+                           (emblem_local_x <= (36 - (29 - emblem_local_y)))))) begin
+                    layers[LAYER_OBSTACLE] <= 1'b1;
+                    emblem_r <= 2'b00; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                end
+                // White border
+                else if (
                         ((emblem_local_y == 2) && 
                          (emblem_local_x >= 1 && emblem_local_x <= 38)) ||
-                        ((emblem_local_y >= 3 && emblem_local_y <= 15) && 
-                         ((emblem_local_x == 1) || (emblem_local_x == 38))) ||
-                        ((emblem_local_y >= 16 && emblem_local_y <= 30) && 
+                        ((emblem_local_y >= 3 && emblem_local_y <= 30) && 
                          ((emblem_local_x == 1) || (emblem_local_x == 38))) ||
                         ((emblem_local_y >= 31 && emblem_local_y <= 35) && 
                          ((emblem_local_x == (1 + (emblem_local_y - 30))) || 
@@ -291,18 +264,13 @@ always @(posedge clk) begin
                         ((emblem_local_y >= 43 && emblem_local_y <= 45) && 
                          ((emblem_local_x == (14 + (emblem_local_y - 43))) || 
                           (emblem_local_x == (25 - (emblem_local_y - 43)))))
-                    ) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11;
-                    end
-                    
-                    // === GOLD BACKGROUND ===
-                    // Gold/yellow background fill for the shield
-                    // Contains the red lions on top
-                    else if (
-                        ((emblem_local_y >= 3 && emblem_local_y <= 15) && 
-                         (emblem_local_x >= 2 && emblem_local_x <= 37)) ||
-                        ((emblem_local_y >= 16 && emblem_local_y <= 30) && 
+                ) begin
+                    layers[LAYER_OBSTACLE] <= 1'b1;
+                    emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b11;
+                end
+                // Gold background
+                else if (
+                        ((emblem_local_y >= 3 && emblem_local_y <= 30) && 
                          (emblem_local_x >= 2 && emblem_local_x <= 37)) ||
                         ((emblem_local_y >= 31 && emblem_local_y <= 35) && 
                          (emblem_local_x >= (2 + (emblem_local_y - 30)) && 
@@ -313,38 +281,29 @@ always @(posedge clk) begin
                         ((emblem_local_y >= 43 && emblem_local_y <= 45) && 
                          (emblem_local_x >= (15 + (emblem_local_y - 43)) && 
                           emblem_local_x <= (24 - (emblem_local_y - 43))))
-                    ) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b11; emblem_g <= 2'b10; emblem_b <= 2'b00;
-                    end
-                    
-                    // === BLACK OUTER BORDER ===
-                    // Outermost black border of the shield
-                    // Defines the shield's triangular shape
-                    else if (
-                        ((emblem_local_y <= 1) && 
-                         (emblem_local_x >= 2 && emblem_local_x <= 37)) ||
-                        ((emblem_local_y <= 1) && 
-                         ((emblem_local_x <= 1) || (emblem_local_x >= 38))) ||
-                        ((emblem_local_y >= 2 && emblem_local_y <= 15) && 
-                         ((emblem_local_x == 0) || (emblem_local_x == 39))) ||
-                        ((emblem_local_y >= 16 && emblem_local_y <= 30) && 
+                ) begin
+                    layers[LAYER_OBSTACLE] <= 1'b1;
+                    emblem_r <= 2'b11; emblem_g <= 2'b10; emblem_b <= 2'b00;
+                end
+                // Black border
+                else if (
+                        (emblem_local_y <= 1) ||
+                        ((emblem_local_y >= 2 && emblem_local_y <= 30) && 
                          ((emblem_local_x == 0) || (emblem_local_x == 39))) ||
                         ((emblem_local_y >= 31 && emblem_local_y <= 35) && 
-                         ((emblem_local_x == (emblem_local_y - 30)) || 
-                          (emblem_local_x == (39 - (emblem_local_y - 30))))) ||
+                         ((emblem_local_x >= (emblem_local_y - 30) - 1 && emblem_local_x <= (emblem_local_y - 30)) || 
+                          (emblem_local_x >= (39 - (emblem_local_y - 30)) && emblem_local_x <= (39 - (emblem_local_y - 30)) + 1))) ||
                         ((emblem_local_y >= 36 && emblem_local_y <= 42) && 
-                         ((emblem_local_x == (5 + (emblem_local_y - 35))) || 
-                          (emblem_local_x == (34 - (emblem_local_y - 35))))) ||
+                         ((emblem_local_x >= (5 + (emblem_local_y - 35)) - 1 && emblem_local_x <= (5 + (emblem_local_y - 35))) || 
+                          (emblem_local_x >= (34 - (emblem_local_y - 35)) && emblem_local_x <= (34 - (emblem_local_y - 35)) + 1))) ||
                         ((emblem_local_y >= 43 && emblem_local_y <= 45) && 
-                         ((emblem_local_x == (13 + (emblem_local_y - 43))) || 
-                          (emblem_local_x == (26 - (emblem_local_y - 43))))) ||
-                        ((emblem_local_y >= 46 && emblem_local_y <= 47) && 
-                         ((emblem_local_x == 19) || (emblem_local_x == 20)))
-                    ) begin
-                        layers[LAYER_OBSTACLE] <= 1'b1;
-                        emblem_r <= 2'b00; emblem_g <= 2'b00; emblem_b <= 2'b00;
-                    end
+                         ((emblem_local_x >= (13 + (emblem_local_y - 43)) - 1 && emblem_local_x <= (13 + (emblem_local_y - 43))) || 
+                          (emblem_local_x >= (26 - (emblem_local_y - 43)) && emblem_local_x <= (26 - (emblem_local_y - 43)) + 1))) ||
+                    ((emblem_local_y >= 46 && emblem_local_y <= 47) && 
+                      ((emblem_local_x >= 16) && (emblem_local_x <= 23)))
+                ) begin
+                    layers[LAYER_OBSTACLE] <= 1'b1;
+                    emblem_r <= 2'b00; emblem_g <= 2'b00; emblem_b <= 2'b00;
                 end
             end
         end

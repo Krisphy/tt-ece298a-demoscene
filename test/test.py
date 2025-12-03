@@ -17,9 +17,9 @@ async def test_project(dut):
     clock = Clock(dut.clk, 40, units="ns")
     cocotb.start_soon(clock.start())
 
-    # Initialize inputs
+    # Initialize inputs (active low buttons)
     dut.ena.value = 1
-    dut.ui_in.value = 0
+    dut.ui_in.value = 0xFF
     dut.uio_in.value = 0
     
     # Reset
