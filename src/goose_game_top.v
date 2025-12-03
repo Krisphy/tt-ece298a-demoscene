@@ -1,15 +1,12 @@
 /*
  * Goose Game - Chrome Dino style game for Tiny Tapeout
  * 
- * Top-level module that instantiates and connects all submodules:
- * - Game Controller (game state, obstacles)
- * - Video Controller (rendering)
+ * Top-level module that connects:
+ * - Game Controller (game state, obstacles, speed progression)
+ * - Rendering (sprites, collision detection)
  * - Jump Physics
  * - Scroll Logic
  * - VGA Sync Generator
- * - Random Number Generator
- * 
- * Jump over ION railway crossings and dodge UW emblems!
  */
 
 `default_nettype none
@@ -49,17 +46,15 @@ module tt_um_goose_game(
   // From game_controller
   wire game_over;
   wire game_reset;
-  wire game_halt;
-  wire game_start_blink;
-  wire obstacle_active;
   wire [9:0] obstacle_pos;
-  wire [3:0] speed_level;
+  wire [2:0] speed_level;
   
   // From jumping
   wire [6:0] jump_pos;
   
   // From scroll
   wire [10:0] scrolladdr;
+  wire [17:0] scroll_period;
   
   // From rendering
   wire collision;
@@ -96,6 +91,7 @@ module tt_um_goose_game(
     .vpos(vpos)
   );
 
+  // Game Controller, controls the game state and logic
   game_controller game_ctrl(
     .clk(clk),
     .rst_n(rst_n),
@@ -104,19 +100,16 @@ module tt_um_goose_game(
     .scrolladdr(scrolladdr[9:0]),
     .game_over(game_over),
     .game_reset(game_reset),
-    .game_halt(game_halt),
-    .game_start_blink(game_start_blink),
-    .obstacle_active(obstacle_active),
     .obstacle_pos(obstacle_pos),
     .speed_level(speed_level)
   );
 
   // Jump physics
   jumping jumping_inst (
-    .speed(24'd250000),
     .jump(jump_button),
+    .scroll_period(scroll_period),
     .jump_pos(jump_pos),
-    .halt(game_halt),
+    .halt(game_over),
     .game_rst(game_reset),
     .clk(clk),
     .sys_rst(~rst_n)
@@ -125,27 +118,25 @@ module tt_um_goose_game(
   // Scrolling logic
   scroll scroll_inst (
     .pos(scrolladdr),
-    .halt(game_halt),
+    .period_out(scroll_period),
+    .halt(game_over),
     .speed_level(speed_level),
     .game_rst(game_reset),
     .clk(clk),
     .sys_rst(~rst_n)
   );
 
-  // Video Controller / Rendering engine
+  // Video Controller / Rendering engine, detects collisions
   rendering video_ctrl(
     .R(R),
     .G(G),
     .B(B),
     .collision(collision),
     .game_over(game_over),
-    .game_start_blink(game_start_blink),
-    .obstacle_active(obstacle_active),
     .obstacle_pos(obstacle_pos),
     .jump_pos(jump_pos),
     .vaddr(vpos),
     .haddr(hpos),
-    .scrolladdr(scrolladdr),
     .display_on(display_on),
     .clk(clk),
     .sys_rst(~rst_n)

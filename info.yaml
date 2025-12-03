@@ -28,8 +28,8 @@ project:
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
 pinout:
   # Inputs
-  ui[0]: "bt1"
-  ui[1]: "rst" # reset button - resets the game
+  ui[0]: "bt1_n"
+  ui[1]: "rst_n"
   ui[2]: ""
   ui[3]: ""
   ui[4]: ""
@@ -55,7 +55,7 @@ pinout:
   uio[4]: ""
   uio[5]: ""
   uio[6]: ""
-  uio[7]: "A_PWM"
+  uio[7]: ""
 
 # Do not change!
 yaml_version: 6

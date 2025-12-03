@@ -7,14 +7,16 @@
 module jumping (
     input wire jump,
     input wire halt,
-    input wire [23:0] speed,
+    input wire [17:0] scroll_period,
     output reg [6:0] jump_pos,
     input wire game_rst,
     input wire clk,
     input wire sys_rst
 );
 
-reg [23:0] ctr;
+wire [18:0] jump_speed = {scroll_period, 1'b0};  // scroll_period << 1
+
+reg [18:0] ctr;
 reg [5:0] frame;
 reg in_air;
 reg [6:0] y_table[25:0];
@@ -23,7 +25,7 @@ wire [4:0] table_idx = (frame <= 6'd25) ? frame[4:0] : (5'd50 - frame[4:0]);
 
 always @(posedge clk) begin
     if (game_rst || sys_rst) begin
-        ctr <= 24'd0;
+        ctr <= 19'd0;
         frame <= 6'd0;
         in_air <= 1'b0;
         jump_pos <= 7'd0;
@@ -32,9 +34,9 @@ always @(posedge clk) begin
         jump_pos <= y_table[table_idx];
         if (!halt) begin
             if (in_air) begin
-                ctr <= ctr + 24'd1;
-                if (ctr == speed) begin
-                    ctr <= 24'd0;
+                ctr <= ctr + 19'd1;
+                if (ctr == jump_speed) begin
+                    ctr <= 19'd0;
                     frame <= frame + 6'd1;
                     if (frame + 6'd1 >= 6'd50) begin
                         frame <= 6'd0;
