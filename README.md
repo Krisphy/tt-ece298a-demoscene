@@ -26,7 +26,7 @@ The design is organized into five main modules:
 - **`scroll.v`**: Horizontal scrolling logic with configurable speed
 - **`hvsync_generator.v`**: VGA timing signal generation (hsync, vsync, display_on)
 
-insert diagram here
+![System Block Diagram](docs/block-diagram.png)
 
 ## Inputs and Outputs
 
