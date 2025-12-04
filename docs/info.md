@@ -23,7 +23,7 @@ The design is organized into six main modules that work together to create a com
 
 ### System Flow
 
-insert diagram here
+![System Block Diagram](block-diagram.png)
 
 ### Key Design Specifications
 
