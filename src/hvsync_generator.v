@@ -11,52 +11,56 @@ module hvsync_generator(
   output reg hsync,
   output reg vsync,
   output wire display_on,
-  output wire [9:0] hpos,
-  output wire [9:0] vpos
+  output reg [9:0] hpos,
+  output reg [9:0] vpos
 );
 
-  // VGA 640x480 @ 60Hz timing
-  localparam H_DISPLAY = 640;
-  localparam H_SYNC_START = 656;  // 640 + 16 (front porch)
-  localparam H_SYNC_END = 752;    // 656 + 96 (sync pulse)
-  localparam H_TOTAL = 799;       // 800 - 1
-  
-  localparam V_DISPLAY = 480;
-  localparam V_SYNC_START = 490;  // 480 + 10 (front porch)
-  localparam V_SYNC_END = 492;    // 490 + 2 (sync pulse)
-  localparam V_TOTAL = 524;       // 525 - 1
+  // horizontal constants
+  parameter H_DISPLAY       = 640; // horizontal display width
+  parameter H_BACK          =  48; // horizontal left border (back porch)
+  parameter H_FRONT         =  16; // horizontal right border (front porch)
+  parameter H_SYNC          =  96; // horizontal sync width
 
-  reg [9:0] h_count;
-  reg [9:0] v_count;
+  // vertical constants
+  parameter V_DISPLAY       = 480; // vertical display height
+  parameter V_TOP           =  33; // vertical top border
+  parameter V_BOTTOM        =  10; // vertical bottom border
+  parameter V_SYNC          =   2; // vertical sync # lines
 
-  // VGA timing state machine
+  // derived constants
+  parameter H_SYNC_START    = H_DISPLAY + H_FRONT;
+  parameter H_SYNC_END      = H_DISPLAY + H_FRONT + H_SYNC - 1;
+  parameter H_MAX           = H_DISPLAY + H_BACK + H_FRONT + H_SYNC - 1;
+
+  parameter V_SYNC_START    = V_DISPLAY + V_BOTTOM;
+  parameter V_SYNC_END      = V_DISPLAY + V_BOTTOM + V_SYNC - 1;
+  parameter V_MAX           = V_DISPLAY + V_TOP + V_BOTTOM + V_SYNC - 1;
+
+  wire hmaxxed = (hpos == H_MAX) || reset;	// set when hpos is maximum or on reset
+  wire vmaxxed = (vpos == V_MAX) || reset;	// set when vpos is maximum or on reset
+
+  // horizontal position counter and hsync
   always @(posedge clk) begin
-    if (reset) begin
-      h_count <= 10'd0;
-      v_count <= 10'd0;
-      hsync <= 1'b1;  // Sync inactive (high) during reset
-      vsync <= 1'b1;
-    end else begin
-      // Horizontal counter - increment every clock
-      if (h_count == H_TOTAL) begin
-        h_count <= 10'd0;
-        // Vertical counter - increment at end of line
-        v_count <= (v_count == V_TOTAL) ? 10'd0 : v_count + 10'd1;
-      end else begin
-        h_count <= h_count + 10'd1;
-      end
-      
-      // Generate sync pulses (active low)
-      hsync <= (h_count >= H_SYNC_START && h_count < H_SYNC_END) ? 1'b0 : 1'b1;
-      vsync <= (v_count >= V_SYNC_START && v_count < V_SYNC_END) ? 1'b0 : 1'b1;
+    hsync <= (hpos >= H_SYNC_START && hpos <= H_SYNC_END);
+    if (hmaxxed)
+      hpos <= 0;
+    else
+      hpos <= hpos + 1;
+  end
+
+  // vertical position counter and vsync
+  always @(posedge clk) begin
+    vsync <= (vpos >= V_SYNC_START && vpos <= V_SYNC_END);
+    if (hmaxxed) begin
+      if (vmaxxed)
+        vpos <= 0;
+      else
+        vpos <= vpos + 1;
     end
   end
 
-  // Display enable - single centralized check saves area in rendering modules
-  assign display_on = (h_count < H_DISPLAY) && (v_count < V_DISPLAY);
-  // Pixel position outputs for rendering engine
-  assign hpos = h_count;
-  assign vpos = v_count;
+  // display_on is set when beam is in "safe" visible frame
+  assign display_on = (hpos < H_DISPLAY) && (vpos < V_DISPLAY);
 
 endmodule
 
