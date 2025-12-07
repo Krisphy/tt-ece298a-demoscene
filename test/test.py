@@ -41,10 +41,10 @@ async def test_project(dut):
     assert dut.uo_out[7].value == 1
     assert dut.uo_out[3].value == 1
 
-    # hsync should go low after the front porch
-    await ClockCycles(dut.clk, 640+16)
+    # hsync should go low after the front porch (+2 for register pipeline)
+    await ClockCycles(dut.clk, 640+16+2)
     assert dut.uo_out[7].value == 0
 
-    # and high again
-    await ClockCycles(dut.clk, 97)
+    # and high again after sync pulse
+    await ClockCycles(dut.clk, 96)
     assert dut.uo_out[7].value == 1
