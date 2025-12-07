@@ -59,10 +59,10 @@ function [5:0] palette;
     input [COLOR_BITS-1:0] idx;
     begin
         case (idx)
-            COLOR_GOOSE_BODY: palette = {2'b10, 2'b10, 2'b01};
+            COLOR_GOOSE_BODY: palette = {2'b11, 2'b10, 2'b00};
             COLOR_BLACK:      palette = {2'b00, 2'b00, 2'b00};
-            COLOR_BEAK:       palette = {2'b11, 2'b10, 2'b01};
-            COLOR_RED:        palette = {2'b10, 2'b00, 2'b00};
+            COLOR_BEAK:       palette = {2'b11, 2'b11, 2'b00};
+            COLOR_RED:        palette = {2'b11, 2'b00, 2'b00};
             default:          palette = 6'b000000;
         endcase
     end
@@ -111,13 +111,13 @@ assign final_r = (layers[LAYER_GOOSE] ? goose_r :
                   layers[LAYER_OBSTACLE] ? emblem_r :
                   layers[LAYER_FLOOR_DOTS] ? 2'b10 :
                   layers[LAYER_FLOOR] ? 2'b01 :
-                  layers[LAYER_SKY] ? 2'b00 : 2'b00);
+                  layers[LAYER_SKY] ? 2'b01 : 2'b00);
 
 assign final_g = (layers[LAYER_GOOSE] ? goose_g :
                   layers[LAYER_OBSTACLE] ? emblem_g :
                   layers[LAYER_FLOOR_DOTS] ? 2'b10 :
                   layers[LAYER_FLOOR] ? 2'b01 :
-                  layers[LAYER_SKY] ? 2'b11 : 2'b00);
+                  layers[LAYER_SKY] ? 2'b10 : 2'b00);
 
 assign final_b = (layers[LAYER_GOOSE] ? goose_b :
                   layers[LAYER_OBSTACLE] ? emblem_b :
@@ -212,7 +212,7 @@ always @(posedge clk) begin
                      ((emblem_local_y >= 7 && emblem_local_y <= 9) && (emblem_local_x >= 12 && emblem_local_x <= 14)) ||
                      ((emblem_local_y >= 9 && emblem_local_y <= 10) && (emblem_local_x >= 14 && emblem_local_x <= 15)))) begin
                     layers[LAYER_OBSTACLE] <= 1'b1;
-                    emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                    emblem_r <= 2'b11; emblem_g <= 2'b00; emblem_b <= 2'b00;
                 end
                 else if (((emblem_local_y >= 7 && emblem_local_y <= 13) && 
                           (emblem_local_x >= 25 && emblem_local_x <= 33)) &&
@@ -220,7 +220,7 @@ always @(posedge clk) begin
                           ((emblem_local_y >= 7 && emblem_local_y <= 9) && (emblem_local_x >= 26 && emblem_local_x <= 28)) ||
                           ((emblem_local_y >= 9 && emblem_local_y <= 10) && (emblem_local_x >= 25 && emblem_local_x <= 26)))) begin
                     layers[LAYER_OBSTACLE] <= 1'b1;
-                    emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                    emblem_r <= 2'b11; emblem_g <= 2'b00; emblem_b <= 2'b00;
                 end
                 else if (((emblem_local_y >= 28 && emblem_local_y <= 37) && 
                           (emblem_local_x >= 15 && emblem_local_x <= 25)) &&
@@ -229,7 +229,7 @@ always @(posedge clk) begin
                           ((emblem_local_y >= 32 && emblem_local_y <= 33) && 
                            ((emblem_local_x >= 15 && emblem_local_x <= 16) || (emblem_local_x >= 24 && emblem_local_x <= 25))))) begin
                     layers[LAYER_OBSTACLE] <= 1'b1;
-                    emblem_r <= 2'b10; emblem_g <= 2'b00; emblem_b <= 2'b00;
+                    emblem_r <= 2'b11; emblem_g <= 2'b00; emblem_b <= 2'b00;
                 end
                 // White chevron
                 else if (((emblem_local_y >= 17 && emblem_local_y <= 31)) &&
@@ -283,7 +283,7 @@ always @(posedge clk) begin
                           emblem_local_x <= (24 - (emblem_local_y - 43))))
                 ) begin
                     layers[LAYER_OBSTACLE] <= 1'b1;
-                    emblem_r <= 2'b11; emblem_g <= 2'b10; emblem_b <= 2'b00;
+                    emblem_r <= 2'b11; emblem_g <= 2'b11; emblem_b <= 2'b00;
                 end
                 // Black border
                 else if (

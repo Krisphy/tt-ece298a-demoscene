@@ -149,9 +149,9 @@ int main(int argc, char** argv) {
         if (v < V_DISPLAY && h < H_DISPLAY) {
           // Extract 2-bit RGB from uo_out: {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]}
           // Bit mapping: uo_out[7:0] = {HSync, B0, G0, R0, VSync, B1, G1, R1}
-          uint8_t r = ((top->uo_out & 0x01) << 1) | ((top->uo_out & 0x08) >> 3);  // R1, R0
-          uint8_t g = ((top->uo_out & 0x02) << 0) | ((top->uo_out & 0x10) >> 4);  // G1, G0
-          uint8_t b = ((top->uo_out & 0x04) >> 1) | ((top->uo_out & 0x20) >> 5);  // B1, B0
+          uint8_t r = ((top->uo_out & 0x01) << 1) | ((top->uo_out & 0x10) >> 4);  // R1, R0
+          uint8_t g = ((top->uo_out & 0x02) << 0) | ((top->uo_out & 0x20) >> 5);  // G1, G0
+          uint8_t b = ((top->uo_out & 0x04) >> 1) | ((top->uo_out & 0x40) >> 6);  // B1, B0
           
           uint32_t color = 0xFF000000 | 
                           (expand_2bit(r) << 16) | 
