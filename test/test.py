@@ -37,14 +37,14 @@ async def test_project(dut):
     # skip first scanline for initialization
     await ClockCycles(dut.clk, 800)
 
-    # hsync and vsync should be de-asserted (low for active-high sync)
-    assert dut.uo_out[7].value == 0
-    assert dut.uo_out[3].value == 0
-
-    # hsync should go high after the front porch
-    await ClockCycles(dut.clk, 640+16)
+    # hsync and vsync should be de-asserted (high for active-low sync)
     assert dut.uo_out[7].value == 1
+    assert dut.uo_out[3].value == 1
 
-    # and low again
-    await ClockCycles(dut.clk, 97)
+    # hsync should go low after the front porch
+    await ClockCycles(dut.clk, 640+16)
     assert dut.uo_out[7].value == 0
+
+    # and high again
+    await ClockCycles(dut.clk, 97)
+    assert dut.uo_out[7].value == 1

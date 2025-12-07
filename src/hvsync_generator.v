@@ -43,7 +43,7 @@ module hvsync_generator(
 
   // Horizontal counter and sync generation
   always @(posedge clk) begin
-    hsync <= (h_count >= H_SYNC_START && h_count <= H_SYNC_END);
+    hsync <= ~(h_count >= H_SYNC_START && h_count <= H_SYNC_END);
     if (hmaxxed)
       h_count <= 10'd0;
     else
@@ -52,7 +52,7 @@ module hvsync_generator(
 
   // Vertical counter and sync generation
   always @(posedge clk) begin
-    vsync <= (v_count >= V_SYNC_START && v_count <= V_SYNC_END);
+    vsync <= ~(v_count >= V_SYNC_START && v_count <= V_SYNC_END);
     if (hmaxxed) begin
       if (vmaxxed)
         v_count <= 10'd0;
